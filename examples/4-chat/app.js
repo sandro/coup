@@ -1,4 +1,5 @@
 import { CoupElement, html, repeat } from 'coup'
+import { Router } from '../../router.js'
 
 // ────────────────────────────────────────────────────
 // Fake data & helpers
@@ -11,7 +12,7 @@ const ROOMS = ['general', 'random', 'music']
 const BOTS = ['Ada', 'Grace', 'Linus']
 const BOT_MESSAGES = [
   'has anyone tried coup?', 'nice!', 'lol', 'brb', '👀', 'totally agree',
-  'that\'s a good point', 'wait what', '🎵', 'shipped it 🚀',
+  "that's a good point", 'wait what', '🎵', 'shipped it 🚀',
   'same', 'works on my machine', '😂', '+1', 'interesting...',
 ]
 
@@ -22,6 +23,15 @@ function randomFrom(arr) {
 function timestamp() {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
+
+// ────────────────────────────────────────────────────
+// Router — room switching via URL hash
+// ────────────────────────────────────────────────────
+
+const router = new Router({
+  '/':           () => 'general',
+  '/:room':      ({ room }) => room,
+})
 
 
 // ────────────────────────────────────────────────────
@@ -141,6 +151,7 @@ ChatRoom.define()
 
 // ────────────────────────────────────────────────────
 // chat-app: top-level — sidebar + active room
+// Uses the router to determine which room is active
 // ────────────────────────────────────────────────────
 
 class ChatApp extends CoupElement {
@@ -152,7 +163,6 @@ class ChatApp extends CoupElement {
 
   state = {
     user: 'you',
-    activeRoom: 'general',
     // Messages keyed by room name
     messages: {
       general: [
@@ -173,6 +183,21 @@ class ChatApp extends CoupElement {
     super()
     // Bots post messages every few seconds
     this._botTimer = setInterval(() => this.botMessage(), 5000)
+  }
+
+  connected() {
+    // Re-render when the URL hash changes (room switch)
+    this._unsubRouter = router.subscribe(() => this.render())
+  }
+
+  disconnected() {
+    this._unsubRouter()
+    clearInterval(this._botTimer)
+  }
+
+  get activeRoom() {
+    const room = router.render()
+    return ROOMS.includes(room) ? room : 'general'
   }
 
   botMessage() {
@@ -203,16 +228,10 @@ class ChatApp extends CoupElement {
         [room]: [...this.state.messages[room], msg],
       }
       // Only re-render if we're viewing that room
-      if (room === this.state.activeRoom) {
+      if (room === this.activeRoom) {
         this.render()
       }
     }, 1500)
-  }
-
-  switchRoom(room) {
-    if (room === this.state.activeRoom) return
-    this.state.activeRoom = room
-    this.render()
   }
 
   onSend(e) {
@@ -240,20 +259,21 @@ class ChatApp extends CoupElement {
   }
 
   template() {
-    const { activeRoom, messages, user } = this.state
+    const activeRoom = this.activeRoom
+    const { messages, user } = this.state
     const roomMsgs = messages[activeRoom] || []
 
     return html`
       <div class="sidebar">
         <h2>Rooms</h2>
         ${ROOMS.map(room => html`
-          <button
+          <a
             class="room-btn ${room === activeRoom ? 'active' : ''}"
-            @click=${() => this.switchRoom(room)}
+            href="#/${room}"
           >
             # ${room}
             ${messages[room]?.length ? html`<span>(${messages[room].length})</span>` : ''}
-          </button>
+          </a>
         `)}
         <div class="user-label">
           <input

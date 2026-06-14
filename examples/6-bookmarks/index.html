@@ -21,6 +21,18 @@
 
     bookmark-app { display: block; }
 
+    /* Nav */
+    .app-nav {
+      display: flex; gap: 0.5rem; margin-bottom: 1rem;
+      border-bottom: 1px solid #334155; padding-bottom: 0.75rem;
+    }
+    .nav-link {
+      padding: 0.4rem 0.8rem; font-size: 0.9rem; color: #94a3b8;
+      text-decoration: none; border-radius: 6px; transition: all 0.15s;
+    }
+    .nav-link:hover { background: #1e293b; color: #e2e8f0; }
+    .nav-link.active { background: #3b82f6; color: white; }
+
     /* Toolbar */
     .toolbar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
     .toolbar input[type="text"] {
@@ -32,7 +44,7 @@
     .tag-btn {
       padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 99px; cursor: pointer;
       border: 1px solid #475569; background: transparent; color: #94a3b8;
-      transition: all 0.15s;
+      transition: all 0.15s; text-decoration: none;
     }
     .tag-btn:hover { border-color: #3b82f6; color: #e2e8f0; }
     .tag-btn.active { background: #3b82f6; border-color: #3b82f6; color: white; }
@@ -46,9 +58,17 @@
 
     /* Add form */
     .add-form {
-      display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.5rem;
-      padding: 1rem; background: #1e293b; border-radius: 8px; margin-bottom: 1rem;
+      display: flex; flex-direction: column; gap: 0.5rem;
+      padding: 1.5rem; background: #1e293b; border-radius: 8px; margin-bottom: 1rem;
+      max-width: 500px;
     }
+    .add-form h3 { margin-bottom: 0.5rem; }
+    .form-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem; }
+    .cancel-btn {
+      padding: 0.5rem 1rem; font-size: 0.85rem; color: #94a3b8;
+      text-decoration: none; border-radius: 6px;
+    }
+    .cancel-btn:hover { background: #334155; color: #e2e8f0; }
     .add-form input {
       padding: 0.5rem 0.75rem; font-size: 0.85rem;
       background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0;
@@ -88,8 +108,9 @@
     .bookmark .tags { display: flex; gap: 0.25rem; flex-shrink: 0; }
     .bookmark .tag {
       font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 99px;
-      background: #334155; color: #94a3b8;
+      background: #334155; color: #94a3b8; text-decoration: none;
     }
+    .bookmark .tag:hover { background: #475569; color: #e2e8f0; }
     .bookmark .actions { display: flex; gap: 0.25rem; flex-shrink: 0; }
     .bookmark button {
       background: none; border: none; color: #64748b; cursor: pointer;

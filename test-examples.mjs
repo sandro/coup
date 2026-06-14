@@ -192,13 +192,17 @@ await test('Bookmarks — tag filter', '/examples/6-bookmarks/index.html', async
   assert(cards === 2, `Tag "tools": ${cards} cards (expected 2)`)
 })
 
-await test('Bookmarks — add bookmark', '/examples/6-bookmarks/index.html', async (page) => {
+await test('Bookmarks — add bookmark via route', '/examples/6-bookmarks/index.html', async (page) => {
   await page.waitForSelector('bookmark-card', { timeout: 5000 })
+  // Navigate to add route
+  await page.locator('.nav-link', { hasText: 'Add New' }).click()
+  await page.waitForSelector('.add-form', { timeout: 5000 })
   await page.locator('.title-input').fill('Test Site')
   await page.locator('.url-input').fill('https://example.com')
   await page.locator('.tags-input').fill('test')
   await page.locator('bookmark-add button[type="submit"]').click()
   await page.waitForTimeout(300)
+  // Should navigate back to list with new bookmark
   const cards = await page.locator('bookmark-card').count()
   assert(cards === 7, `After add: ${cards} cards (expected 7)`)
 })
@@ -215,11 +219,43 @@ await test('Bookmarks — pin/unpin updates order', '/examples/6-bookmarks/index
   await page.waitForSelector('bookmark-card', { timeout: 5000 })
   // Hacker News is unpinned — click pin on it
   const hnCard = page.locator('bookmark-card', { hasText: 'Hacker News' })
-  await hnCard.locator('button', { hasText: '📎' }).click()
+  await hnCard.locator('button', { hasText: '☆' }).click()
   await page.waitForTimeout(300)
-  // It should now show 📌
+  // It should now show ⭐
   const pinIcon = await hnCard.locator('button').first().innerText()
-  assert(pinIcon.includes('📌'), `Should be pinned, got: ${pinIcon}`)
+  assert(pinIcon.includes('⭐'), `Should be pinned, got: ${pinIcon}`)
+})
+
+// ── Router tests ──
+await test('Chat — room URL routes', '/examples/4-chat/index.html', async (page) => {
+  await page.waitForSelector('chat-room', { timeout: 5000 })
+  // Navigate via hash
+  await page.goto(page.url().split('#')[0] + '#/music')
+  await page.waitForTimeout(500)
+  const active = await page.locator('.room-btn.active').innerText()
+  assert(active.includes('music'), `Active room after hash nav: "${active}"`)
+})
+
+await test('Bookmarks — tag route filters', '/examples/6-bookmarks/index.html', async (page) => {
+  await page.waitForSelector('bookmark-card', { timeout: 5000 })
+  // Navigate to tag route via hash
+  await page.goto(page.url().split('#')[0] + '#/tag/docs')
+  await page.waitForTimeout(500)
+  const cards = await page.locator('bookmark-card').count()
+  assert(cards === 3, `Tag route "docs": ${cards} cards (expected 3)`)
+  const activeTag = await page.locator('.tag-btn.active').innerText()
+  assert(activeTag === 'docs', `Active tag btn: "${activeTag}"`)
+})
+
+await test('Bookmarks — add route shows form', '/examples/6-bookmarks/index.html', async (page) => {
+  await page.waitForSelector('bookmark-card', { timeout: 5000 })
+  await page.goto(page.url().split('#')[0] + '#/add')
+  await page.waitForSelector('.add-form', { timeout: 5000 })
+  const hasForm = await page.locator('.add-form').count()
+  assert(hasForm === 1, 'Add form visible via route')
+  // List should not be visible
+  const list = await page.locator('bookmark-list').count()
+  assert(list === 0, 'Bookmark list hidden on add route')
 })
 
 // ── Results ──
