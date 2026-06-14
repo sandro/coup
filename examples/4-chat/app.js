@@ -28,10 +28,10 @@ function timestamp() {
 // Router — room switching via URL hash
 // ────────────────────────────────────────────────────
 
-const router = new Router({
-  '/':           () => 'general',
-  '/:room':      ({ room }) => room,
-})
+const router = new Router([
+  '/',
+  '/:room',
+])
 
 
 // ────────────────────────────────────────────────────
@@ -74,10 +74,7 @@ class ChatRoom extends CoupElement {
 
   state = { typing: null }
 
-  // Fake "someone is typing" indicator — only shows when a
-  // bot message is actually incoming for THIS room
   connected() {
-    // Listen for the bot's "pre-typing" signal
     this._onTyping = (e) => {
       if (e.detail.room !== this.room) return
       this.state.typing = e.detail.author
@@ -92,7 +89,6 @@ class ChatRoom extends CoupElement {
     window.addEventListener('chat:typing-done', this._onTypingDone)
   }
 
-  // Clean up listeners when component is destroyed (room switch)
   disconnected() {
     window.removeEventListener('chat:typing', this._onTyping)
     window.removeEventListener('chat:typing-done', this._onTypingDone)
@@ -107,13 +103,11 @@ class ChatRoom extends CoupElement {
     input.value = ''
   }
 
-  // Scroll to bottom when new messages arrive
   updated() {
     const msgs = this.$('.messages')
     if (msgs) msgs.scrollTop = msgs.scrollHeight
   }
 
-  // Override render to call updated() after applying template
   render() {
     super.render()
     this.updated()
@@ -151,7 +145,6 @@ ChatRoom.define()
 
 // ────────────────────────────────────────────────────
 // chat-app: top-level — sidebar + active room
-// Uses the router to determine which room is active
 // ────────────────────────────────────────────────────
 
 class ChatApp extends CoupElement {
@@ -163,7 +156,6 @@ class ChatApp extends CoupElement {
 
   state = {
     user: 'you',
-    // Messages keyed by room name
     messages: {
       general: [
         { id: 1, author: 'Ada',   text: 'welcome to #general!', time: '9:00 AM', system: false },
@@ -181,12 +173,10 @@ class ChatApp extends CoupElement {
 
   constructor() {
     super()
-    // Bots post messages every few seconds
     this._botTimer = setInterval(() => this.botMessage(), 5000)
   }
 
   connected() {
-    // Re-render when the URL hash changes (room switch)
     this._unsubRouter = router.subscribe(() => this.render())
   }
 
@@ -196,7 +186,7 @@ class ChatApp extends CoupElement {
   }
 
   get activeRoom() {
-    const room = router.render()
+    const room = router.params.room
     return ROOMS.includes(room) ? room : 'general'
   }
 
@@ -205,7 +195,6 @@ class ChatApp extends CoupElement {
     const author = randomFrom(BOTS)
     const text = randomFrom(BOT_MESSAGES)
 
-    // Show typing indicator first, then deliver the message
     window.dispatchEvent(new CustomEvent('chat:typing', {
       detail: { room, author }
     }))
@@ -222,12 +211,10 @@ class ChatApp extends CoupElement {
         time: timestamp(),
         system: false,
       }
-      // New array reference so child prop setter sees the change
       this.state.messages = {
         ...this.state.messages,
         [room]: [...this.state.messages[room], msg],
       }
-      // Only re-render if we're viewing that room
       if (room === this.activeRoom) {
         this.render()
       }
@@ -252,10 +239,7 @@ class ChatApp extends CoupElement {
 
   changeUser(e) {
     const name = e.target.value.trim()
-    if (name) {
-      this.state.user = name
-      // No render needed — it only matters on next send
-    }
+    if (name) this.state.user = name
   }
 
   template() {

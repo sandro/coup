@@ -1,38 +1,40 @@
 import { CoupElement, html, Store, repeat } from 'coup'
 import { Router } from '../../router.js'
 
-// ============================================================
-// Store — the single source of truth, shared across components
-// ============================================================
-
-let nextId = 1
+// ────────────────────────────────────────────────────
+// Store — single source of truth for bookmarks
+// ────────────────────────────────────────────────────
 
 const bookmarkStore = new Store({
   bookmarks: [
-    { id: nextId++, title: 'MDN Web Docs', url: 'https://developer.mozilla.org', tags: ['docs', 'reference'], pinned: true },
-    { id: nextId++, title: 'lit-html Guide', url: 'https://lit.dev/docs/templates/overview/', tags: ['docs', 'lit'], pinned: false },
-    { id: nextId++, title: 'Can I Use', url: 'https://caniuse.com', tags: ['tools', 'reference'], pinned: true },
-    { id: nextId++, title: 'GitHub', url: 'https://github.com', tags: ['tools'], pinned: false },
-    { id: nextId++, title: 'Hacker News', url: 'https://news.ycombinator.com', tags: ['news'], pinned: false },
-    { id: nextId++, title: 'CSS Tricks', url: 'https://css-tricks.com', tags: ['docs', 'css'], pinned: false },
+    { id: 1, title: 'MDN Web Docs',    url: 'https://developer.mozilla.org', tags: ['docs', 'reference'], pinned: true },
+    { id: 2, title: 'GitHub',          url: 'https://github.com',            tags: ['tools', 'code'],      pinned: true },
+    { id: 3, title: 'Hacker News',     url: 'https://news.ycombinator.com',  tags: ['news', 'tech'],       pinned: false },
+    { id: 4, title: 'Can I Use',       url: 'https://caniuse.com',           tags: ['docs', 'reference'],  pinned: false },
+    { id: 5, title: 'Lobsters',        url: 'https://lobste.rs',             tags: ['news', 'tech'],       pinned: false },
+    { id: 6, title: 'Bundlephobia',    url: 'https://bundlephobia.com',      tags: ['tools', 'docs'],      pinned: false },
   ],
   search: '',
+  nextId: 7,
 })
 
-// ============================================================
-// Router — views for browsing, adding, and filtering by tag
-// ============================================================
+// ────────────────────────────────────────────────────
+// Router
+// ────────────────────────────────────────────────────
 
-const router = new Router({
-  '/':          () => ({ view: 'list', tag: null }),
-  '/add':       () => ({ view: 'add', tag: null }),
-  '/tag/:tag':  ({ tag }) => ({ view: 'list', tag }),
-})
+const router = new Router([
+  '/',
+  '/add',
+  '/tag/:tag',
+])
 
-// Derived data — computed from store + router, not stored
+// ────────────────────────────────────────────────────
+// Derived data — computed from store + router
+// ────────────────────────────────────────────────────
+
 function getFilteredBookmarks() {
   const { bookmarks, search } = bookmarkStore.state
-  const { tag } = router.render() || { tag: null }
+  const tag = router.params.tag || null
   return bookmarks
     .filter(b => {
       if (tag && !b.tags.includes(tag)) return false
@@ -45,15 +47,14 @@ function getFilteredBookmarks() {
 
 function getAllTags() {
   const tags = new Set()
-  for (const b of bookmarkStore.state.bookmarks) {
-    for (const t of b.tags) tags.add(t)
-  }
+  bookmarkStore.state.bookmarks.forEach(b => b.tags.forEach(t => tags.add(t)))
   return [...tags].sort()
 }
 
-// ============================================================
-// bookmark-toolbar — search + tag filter via router links
-// ============================================================
+
+// ────────────────────────────────────────────────────
+// bookmark-toolbar: search + tag filter
+// ────────────────────────────────────────────────────
 
 class BookmarkToolbar extends CoupElement {
   static tag = 'bookmark-toolbar'
@@ -75,7 +76,7 @@ class BookmarkToolbar extends CoupElement {
   template() {
     const { search } = bookmarkStore.state
     const tags = getAllTags()
-    const activeTag = (router.render() || {}).tag
+    const activeTag = router.params.tag || null
 
     return html`
       <div class="toolbar">
@@ -85,11 +86,14 @@ class BookmarkToolbar extends CoupElement {
           .value=${search}
           @input=${(e) => this.onSearch(e)}
         />
-        <div class="tag-filters">
-          <a class="tag-btn ${!activeTag ? 'active' : ''}" href="#/">all</a>
+        <div class="tags">
+          <a
+            class="tag-btn ${!activeTag ? 'active' : ''}"
+            href="#/"
+          >all</a>
           ${tags.map(tag => html`
             <a
-              class="tag-btn ${activeTag === tag ? 'active' : ''}"
+              class="tag-btn ${tag === activeTag ? 'active' : ''}"
               href="#/tag/${tag}"
             >${tag}</a>
           `)}
@@ -100,9 +104,10 @@ class BookmarkToolbar extends CoupElement {
 }
 BookmarkToolbar.define()
 
-// ============================================================
-// bookmark-stats — shows counts, subscribes independently
-// ============================================================
+
+// ────────────────────────────────────────────────────
+// bookmark-stats: shows counts
+// ────────────────────────────────────────────────────
 
 class BookmarkStats extends CoupElement {
   static tag = 'bookmark-stats'
@@ -118,71 +123,62 @@ class BookmarkStats extends CoupElement {
   }
 
   template() {
-    const { bookmarks } = bookmarkStore.state
-    const filtered = getFilteredBookmarks()
-    const pinned = bookmarks.filter(b => b.pinned).length
+    const all = bookmarkStore.state.bookmarks.length
+    const filtered = getFilteredBookmarks().length
+    const pinned = bookmarkStore.state.bookmarks.filter(b => b.pinned).length
 
     return html`
       <div class="stats">
-        <span><strong>${bookmarks.length}</strong> total</span>
-        <span><strong>${pinned}</strong> pinned</span>
-        <span><strong>${filtered.length}</strong> showing</span>
-        <span><strong>${getAllTags().length}</strong> tags</span>
+        Showing ${filtered} of ${all} bookmarks · ${pinned} pinned
       </div>
     `
   }
 }
 BookmarkStats.define()
 
-// ============================================================
-// bookmark-card — displays a single bookmark
-// ============================================================
+
+// ────────────────────────────────────────────────────
+// bookmark-card: a single bookmark
+// ────────────────────────────────────────────────────
 
 class BookmarkCard extends CoupElement {
   static tag = 'bookmark-card'
   static props = { bookmark: Object }
 
   togglePin() {
+    const b = this.bookmark
     bookmarkStore.set(s => ({
-      bookmarks: s.bookmarks.map(b =>
-        b.id === this.bookmark.id ? { ...b, pinned: !b.pinned } : b
+      bookmarks: s.bookmarks.map(x =>
+        x.id === b.id ? { ...x, pinned: !x.pinned } : x
       )
     }))
   }
 
   deleteBookmark() {
+    const b = this.bookmark
     bookmarkStore.set(s => ({
-      bookmarks: s.bookmarks.filter(b => b.id !== this.bookmark.id)
+      bookmarks: s.bookmarks.filter(x => x.id !== b.id)
     }))
   }
 
   template() {
     const b = this.bookmark
     if (!b) return html``
-    const domain = new URL(b.url).hostname
 
     return html`
       <div class="bookmark">
-        <img class="favicon"
-          src="https://www.google.com/s2/favicons?domain=${domain}&sz=32"
-          alt="" />
-        <div class="info">
-          <div class="title-row">
-            <span class="title">
-              ${b.pinned ? '⭐ ' : ''}
-              <a href=${b.url} target="_blank">${b.title}</a>
-            </span>
-          </div>
-          <div class="url">${b.url}</div>
-        </div>
-        <div class="tags">
-          ${b.tags.map(t => html`<a class="tag" href="#/tag/${t}">${t}</a>`)}
-        </div>
-        <div class="actions">
-          <button @click=${() => this.togglePin()} title=${b.pinned ? 'Unpin' : 'Pin'}>
+        <div class="bookmark-header">
+          <button @click=${() => this.togglePin()} title="${b.pinned ? 'Unpin' : 'Pin'}">
             ${b.pinned ? '⭐' : '☆'}
           </button>
-          <button class="delete" @click=${() => this.deleteBookmark()} title="Delete">✕</button>
+          <a href=${b.url} target="_blank" class="bookmark-title">
+            ${b.pinned ? '⭐ ' : ''}${b.title}
+          </a>
+          <button class="delete" @click=${() => this.deleteBookmark()}>✕</button>
+        </div>
+        <div class="bookmark-url">${b.url}</div>
+        <div class="bookmark-tags">
+          ${b.tags.map(t => html`<a class="tag" href="#/tag/${t}">${t}</a>`)}
         </div>
       </div>
     `
@@ -190,9 +186,10 @@ class BookmarkCard extends CoupElement {
 }
 BookmarkCard.define()
 
-// ============================================================
-// bookmark-list — renders the filtered list
-// ============================================================
+
+// ────────────────────────────────────────────────────
+// bookmark-list: filtered list of bookmark-cards
+// ────────────────────────────────────────────────────
 
 class BookmarkList extends CoupElement {
   static tag = 'bookmark-list'
@@ -210,24 +207,22 @@ class BookmarkList extends CoupElement {
   template() {
     const bookmarks = getFilteredBookmarks()
 
-    if (bookmarks.length === 0) {
-      return html`<div class="empty">No bookmarks match your search.</div>`
-    }
-
     return html`
-      <div class="bookmark-list">
-        ${repeat(bookmarks, b => b.id, b => html`
-          <bookmark-card .bookmark=${b}></bookmark-card>
-        `)}
-      </div>
+      ${repeat(bookmarks, b => b.id, b => html`
+        <bookmark-card .bookmark=${b}></bookmark-card>
+      `)}
+      ${bookmarks.length === 0 ? html`
+        <div class="empty">No bookmarks match your search.</div>
+      ` : ''}
     `
   }
 }
 BookmarkList.define()
 
-// ============================================================
-// bookmark-add — form to add new bookmarks (its own route)
-// ============================================================
+
+// ────────────────────────────────────────────────────
+// bookmark-add: form to add new bookmarks
+// ────────────────────────────────────────────────────
 
 class BookmarkAdd extends CoupElement {
   static tag = 'bookmark-add'
@@ -236,21 +231,20 @@ class BookmarkAdd extends CoupElement {
     e.preventDefault()
     const title = this.$('.title-input').value.trim()
     const url = this.$('.url-input').value.trim()
-    const tags = this.$('.tags-input').value.trim()
-      .split(',')
-      .map(t => t.trim().toLowerCase())
-      .filter(Boolean)
-
+    const tagsStr = this.$('.tags-input').value.trim()
     if (!title || !url) return
 
     bookmarkStore.set(s => ({
-      bookmarks: [
-        ...s.bookmarks,
-        { id: nextId++, title, url, tags, pinned: false }
-      ]
+      bookmarks: [...s.bookmarks, {
+        id: s.nextId,
+        title,
+        url: url.startsWith('http') ? url : `https://${url}`,
+        tags: tagsStr ? tagsStr.split(',').map(t => t.trim()).filter(Boolean) : [],
+        pinned: false,
+      }],
+      nextId: s.nextId + 1,
     }))
 
-    // Navigate back to list after adding
     router.go('/')
   }
 
@@ -259,10 +253,10 @@ class BookmarkAdd extends CoupElement {
       <form class="add-form" @submit=${(e) => this.addBookmark(e)}>
         <h3>Add Bookmark</h3>
         <input class="title-input" type="text" placeholder="Title" required />
-        <input class="url-input" type="text" placeholder="https://..." required />
-        <input class="tags-input" type="text" placeholder="Tags (comma-separated)" />
+        <input class="url-input" type="url" placeholder="https://example.com" required />
+        <input class="tags-input" type="text" placeholder="Tags (comma separated)" />
         <div class="form-actions">
-          <a href="#/" class="cancel-btn">Cancel</a>
+          <a class="cancel-btn" href="#/">Cancel</a>
           <button type="submit">Add Bookmark</button>
         </div>
       </form>
@@ -271,9 +265,10 @@ class BookmarkAdd extends CoupElement {
 }
 BookmarkAdd.define()
 
-// ============================================================
-// bookmark-app — top-level shell, uses router for views
-// ============================================================
+
+// ────────────────────────────────────────────────────
+// bookmark-app: top-level shell with route-based views
+// ────────────────────────────────────────────────────
 
 class BookmarkApp extends CoupElement {
   static tag = 'bookmark-app'
@@ -287,24 +282,25 @@ class BookmarkApp extends CoupElement {
   }
 
   template() {
-    const route = router.render() || { view: 'list' }
+    const isAdd = router.pattern === '/add'
 
     return html`
       <nav class="app-nav">
-        <a class="nav-link ${route.view === 'list' ? 'active' : ''}" href="#/">
+        <a class="nav-link ${!isAdd ? 'active' : ''}" href="#/">
           📑 Bookmarks
         </a>
-        <a class="nav-link ${route.view === 'add' ? 'active' : ''}" href="#/add">
+        <a class="nav-link ${isAdd ? 'active' : ''}" href="#/add">
           + Add New
         </a>
       </nav>
-      <bookmark-toolbar></bookmark-toolbar>
-      <bookmark-stats></bookmark-stats>
 
-      ${route.view === 'add'
-        ? html`<bookmark-add></bookmark-add>`
-        : html`<bookmark-list></bookmark-list>`
-      }
+      ${isAdd ? html`
+        <bookmark-add></bookmark-add>
+      ` : html`
+        <bookmark-toolbar></bookmark-toolbar>
+        <bookmark-stats></bookmark-stats>
+        <bookmark-list></bookmark-list>
+      `}
     `
   }
 }

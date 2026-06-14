@@ -3,14 +3,16 @@
 // Usage:
 //   import { Router } from './router.js'
 //
-//   const router = new Router({
-//     '/':           () => html`<home-page></home-page>`,
-//     '/chat/:room': ({ room }) => html`<chat-room .name=${room}></chat-room>`,
-//     '/bookmarks':  () => html`<bookmark-list></bookmark-list>`,
-//   })
+//   const router = new Router([
+//     '/',
+//     '/add',
+//     '/chat/:room',
+//   ])
 //
-//   // In a component:
-//   template() { return router.render() }
+//   // In a component template:
+//   if (router.pattern === '/chat/:room') {
+//     return html`<chat-room .name=${router.params.room}></chat-room>`
+//   }
 //
 //   // Navigate:
 //   router.go('/chat/general')
@@ -19,71 +21,35 @@
 //   html`<a href="#/chat/general">General</a>`
 
 export class Router {
-  constructor(routes = {}) {
-    this._routes = Object.entries(routes).map(([pattern, handler]) => ({
-      pattern,
-      handler,
-      regex: this._toRegex(pattern),
-      paramNames: this._extractParams(pattern),
+  constructor(patterns = []) {
+    this._routes = patterns.map(p => ({
+      pattern: p,
+      regex: this._toRegex(p),
+      paramNames: (p.match(/:[a-zA-Z_]+/g) || []).map(m => m.slice(1)),
     }))
-    this._listeners = new Set()
-    this._current = null
 
+    /** Current matched pattern (e.g. '/chat/:room') or null */
+    this.pattern = null
+    /** Extracted params from the current route (e.g. { room: 'general' }) */
+    this.params = {}
+
+    this._listeners = new Set()
     this._onHashChange = () => {
-      this._current = null // bust cache
-      this._listeners.forEach(fn => fn(this.match()))
+      this._resolve()
+      this._listeners.forEach(fn => fn())
     }
     window.addEventListener('hashchange', this._onHashChange)
 
-    // Set initial route
     if (!location.hash) location.hash = '#/'
+    this._resolve()
   }
 
-  /** Convert a route pattern to a regex */
-  _toRegex(pattern) {
-    const escaped = pattern
-      .replace(/:[a-zA-Z_]+/g, '([^/]+)')  // :param → capture group
-      .replace(/\*/g, '(.*)')               // * → wildcard
-    return new RegExp(`^${escaped}$`)
-  }
-
-  /** Extract param names from a pattern */
-  _extractParams(pattern) {
-    const matches = pattern.match(/:[a-zA-Z_]+/g)
-    return matches ? matches.map(m => m.slice(1)) : []
-  }
-
-  /** Get current hash path (without the #) */
+  /** Current hash path (without the #) */
   get path() {
     return location.hash.slice(1) || '/'
   }
 
-  /** Match current path against routes */
-  match() {
-    if (this._current) return this._current
-
-    const path = this.path
-    for (const route of this._routes) {
-      const m = path.match(route.regex)
-      if (m) {
-        const params = {}
-        route.paramNames.forEach((name, i) => {
-          params[name] = decodeURIComponent(m[i + 1])
-        })
-        this._current = { path, pattern: route.pattern, params, handler: route.handler }
-        return this._current
-      }
-    }
-    return { path, pattern: null, params: {}, handler: null }
-  }
-
-  /** Render the matched route's template */
-  render() {
-    const { handler, params } = this.match()
-    return handler ? handler(params) : null
-  }
-
-  /** Navigate to a path programmatically */
+  /** Navigate to a path */
   go(path) {
     location.hash = '#' + path
   }
@@ -99,14 +65,33 @@ export class Router {
     return this.path === path
   }
 
-  /** Check if a path prefix matches (for nav highlighting) */
-  isActivePrefix(prefix) {
-    return this.path.startsWith(prefix)
-  }
-
-  /** Clean up — remove hashchange listener */
+  /** Clean up */
   destroy() {
     window.removeEventListener('hashchange', this._onHashChange)
     this._listeners.clear()
+  }
+
+  _resolve() {
+    const path = this.path
+    for (const route of this._routes) {
+      const m = path.match(route.regex)
+      if (m) {
+        this.pattern = route.pattern
+        this.params = {}
+        route.paramNames.forEach((name, i) => {
+          this.params[name] = decodeURIComponent(m[i + 1])
+        })
+        return
+      }
+    }
+    this.pattern = null
+    this.params = {}
+  }
+
+  _toRegex(pattern) {
+    const escaped = pattern
+      .replace(/:[a-zA-Z_]+/g, '([^/]+)')
+      .replace(/\*/g, '(.*)')
+    return new RegExp(`^${escaped}$`)
   }
 }
