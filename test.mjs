@@ -173,6 +173,116 @@ const attrPropsResult = await page.evaluate(async () => {
 assert(attrPropsResult.t1 === 'abc-123', `Attr→prop initial: "${attrPropsResult.t1}" (expected "abc-123")`)
 assert(attrPropsResult.t2 === 'xyz-789', `Attr→prop change: "${attrPropsResult.t2}" (expected "xyz-789")`)
 
+// Test 12: Debug mode — warns on state change without render()
+const debugResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  CoupElement.debug = true
+
+  const warnings = []
+  const origWarn = console.warn
+  console.warn = (...args) => warnings.push(args.join(' '))
+
+  class DebugTest extends CoupElement {
+    static tag = 'debug-test'
+    state = { count: 0 }
+    template() { return html`<span>${this.state.count}</span>` }
+  }
+  DebugTest.define()
+
+  const el = document.createElement('debug-test')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  // Mutate state without calling render()
+  el.state.count = 42
+  await new Promise(r => setTimeout(r, 50))
+
+  const staleWarning = warnings.some(w => w.includes('render() was not called'))
+
+  // Now mutate and call render() — should NOT warn
+  warnings.length = 0
+  el.state.count = 99
+  el.render()
+  await new Promise(r => setTimeout(r, 50))
+
+  const falseWarning = warnings.some(w => w.includes('render() was not called'))
+
+  console.warn = origWarn
+  CoupElement.debug = false
+  el.remove()
+  return { staleWarning, falseWarning }
+})
+assert(debugResult.staleWarning === true, 'Debug: warns on state change without render()')
+assert(debugResult.falseWarning === false, 'Debug: no false warning when render() is called')
+
+// Test 13: Debug mode — warns on undefined template return
+const debugTplResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  CoupElement.debug = true
+  const warnings = []
+  const origWarn = console.warn
+  console.warn = (...args) => warnings.push(args.join(' '))
+
+  class BadTpl extends CoupElement {
+    static tag = 'bad-tpl'
+    template() { /* forgot return */ }
+  }
+  BadTpl.define()
+
+  const el = document.createElement('bad-tpl')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  const undefinedWarning = warnings.some(w => w.includes('returned undefined'))
+
+  console.warn = origWarn
+  CoupElement.debug = false
+  el.remove()
+  return { undefinedWarning }
+})
+assert(debugTplResult.undefinedWarning === true, 'Debug: warns on undefined template return')
+
+// Test 14: Debug mode — warns on same object reference prop set
+const debugPropResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  CoupElement.debug = true
+  const warnings = []
+  const origWarn = console.warn
+  console.warn = (...args) => warnings.push(args.join(' '))
+
+  class PropRef extends CoupElement {
+    static tag = 'prop-ref'
+    static props = { data: Object }
+    template() { return html`<span>${JSON.stringify(this.data)}</span>` }
+  }
+  PropRef.define()
+
+  const el = document.createElement('prop-ref')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  const obj = { a: 1 }
+  el.data = obj
+  await new Promise(r => setTimeout(r, 50))
+
+  // Set same reference — should warn
+  warnings.length = 0
+  obj.a = 2
+  el.data = obj
+  await new Promise(r => setTimeout(r, 50))
+
+  const sameRefWarning = warnings.some(w => w.includes('same object reference'))
+
+  console.warn = origWarn
+  CoupElement.debug = false
+  el.remove()
+  return { sameRefWarning }
+})
+assert(debugPropResult.sameRefWarning === true, 'Debug: warns on same object reference prop set')
+
 // Summary
 console.log('\n' + (failed ? '❌ SOME TESTS FAILED' : '🎉 All tests passed!'))
 

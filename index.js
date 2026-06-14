@@ -7,6 +7,16 @@ import { repeat } from 'lit-html/directives/repeat.js'
 
 export { html, svg, nothing, repeat }
 
+// --- Debug mode ---
+// Set CoupElement.debug = true to enable dev warnings.
+// Zero cost when off — all checks are gated behind the flag.
+
+let _debug = false
+
+function warn(tag, msg, ...args) {
+  if (_debug) console.warn(`[coup] <${tag}> ${msg}`, ...args)
+}
+
 // --- Store: lightweight observable state ---
 
 export class Store {
@@ -53,9 +63,46 @@ export class CoupElement extends HTMLElement {
   _rendering = false
   _connected = false
 
+  /** Enable debug mode for all components */
+  static set debug(val) { _debug = val }
+  static get debug() { return _debug }
+
   constructor() {
     super()
     this._setupProps()
+  }
+
+  // --- Debug: state mutation tracking ---
+
+  _stateProxy() {
+    this._stateProxied = true
+    const tag = this.constructor.tag
+    let dirty = false
+    let renderCalled = false
+    const origRender = this.render.bind(this)
+
+    this.render = () => {
+      renderCalled = true
+      dirty = false
+      origRender()
+    }
+
+    const handler = {
+      set(target, prop, value) {
+        target[prop] = value
+        dirty = true
+        renderCalled = false
+        // Check on next microtask if render was called
+        queueMicrotask(() => {
+          if (dirty && !renderCalled) {
+            warn(tag, `state.${prop} changed but render() was not called. UI is stale.`)
+          }
+        })
+        return true
+      }
+    }
+
+    this.state = new Proxy(this.state, handler)
   }
 
   // --- Registration ---
@@ -129,6 +176,10 @@ export class CoupElement extends HTMLElement {
           if (old !== val) {
             this._props[name] = val
             this._scheduleRender()
+          } else if (_debug && val !== null && typeof val === 'object') {
+            warn(this.constructor.tag,
+              `prop "${name}" was set to the same object reference. ` +
+              `If you mutated it, use a new object: { ...old, key: newVal }`)
           }
         },
         enumerable: true,
@@ -155,9 +206,13 @@ export class CoupElement extends HTMLElement {
     if (this._rendering) return
     this._rendering = true
     try {
-      litRender(this.template(), this)
+      const result = this.template()
+      if (_debug && result === undefined) {
+        warn(this.constructor.tag, 'template() returned undefined. Did you forget to return html`...`?')
+      }
+      litRender(result, this)
     } catch (err) {
-      console.error(`[coup] ${this.constructor.tag} template() error:`, err)
+      console.error(`[coup] <${this.constructor.tag}> template() error:`, err)
     } finally {
       this._rendering = false
     }
@@ -193,6 +248,10 @@ export class CoupElement extends HTMLElement {
 
   connectedCallback() {
     this._connected = true
+    // Debug: wrap state in proxy on first connect (after class fields init)
+    if (_debug && this.state && !this._stateProxied) {
+      this._stateProxy()
+    }
     this._unbindEvents()
     this._bindEvents()
     this._scheduleRender()
