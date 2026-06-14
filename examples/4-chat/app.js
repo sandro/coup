@@ -186,6 +186,7 @@ class ChatApp extends CoupElement {
   }
 
   get activeRoom() {
+    if (router.pattern === null) return null
     const room = router.params.room
     return ROOMS.includes(room) ? room : 'general'
   }
@@ -244,6 +245,16 @@ class ChatApp extends CoupElement {
 
   template() {
     const activeRoom = this.activeRoom
+
+    if (activeRoom === null) {
+      return html`
+        <div style="padding: 2rem; text-align: center; flex: 1;">
+          <h2>Room not found</h2>
+          <p><a href="#/" style="color: #60a5fa;">Back to #general</a></p>
+        </div>
+      `
+    }
+
     const { messages, user } = this.state
     const roomMsgs = messages[activeRoom] || []
 

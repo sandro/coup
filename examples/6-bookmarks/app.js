@@ -282,6 +282,15 @@ class BookmarkApp extends CoupElement {
   }
 
   template() {
+    if (router.pattern === null) {
+      return html`
+        <div style="padding: 2rem; text-align: center;">
+          <h2>Page not found</h2>
+          <p><a href="#/" style="color: #60a5fa;">Back to bookmarks</a></p>
+        </div>
+      `
+    }
+
     const isAdd = router.pattern === '/add'
 
     return html`
