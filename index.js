@@ -254,6 +254,7 @@ export class CoupElement extends HTMLElement {
     }
     this._unbindEvents()
     this._bindEvents()
+    this._bindSubscriptions()
     this._scheduleRender()
     this.connected()
   }
@@ -261,6 +262,7 @@ export class CoupElement extends HTMLElement {
   disconnectedCallback() {
     this._connected = false
     this._unbindEvents()
+    this._unbindSubscriptions()
     this.disconnected()
   }
 
@@ -269,6 +271,40 @@ export class CoupElement extends HTMLElement {
 
   /** Called when the element is removed from the DOM. Override freely — no super needed. */
   disconnected() {}
+
+  // --- Subscriptions ---
+  //
+  // Auto-subscribe to anything with a .subscribe(fn) → unsubscribe contract.
+  // Renders are batched via _scheduleRender() so multiple stores updating on
+  // the same tick only trigger one render.
+  //
+  // Usage:
+  //   import { appStore, playerStore } from './stores.js'
+  //
+  //   class MyComponent extends CoupElement {
+  //     static subscribe = [appStore, playerStore]
+  //
+  //     template() {
+  //       const { user } = appStore.state
+  //       const { playing } = playerStore.state
+  //       return html`<span>${user} ${playing ? '▶' : '⏸'}</span>`
+  //     }
+  //   }
+  //
+  // Works with coup Store, or anything that has subscribe(fn) → unsubscribe.
+
+  _bindSubscriptions() {
+    const sources = this.constructor.subscribe
+    if (!sources) return
+    this._subs = sources.map(s => s.subscribe(() => this._scheduleRender()))
+  }
+
+  _unbindSubscriptions() {
+    if (this._subs) {
+      this._subs.forEach(fn => fn())
+      this._subs = null
+    }
+  }
 
   // --- Global events ---
 
