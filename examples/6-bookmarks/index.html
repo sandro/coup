@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>coup — Bookmarks</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "lit-html": "https://esm.run/lit-html",
+      "lit-html/": "https://esm.run/lit-html/",
+      "coup": "../../index.js"
+    }
+  }
+  </script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; padding: 1.5rem; }
+    h1 { margin-bottom: 0.25rem; }
+    .subtitle { color: #94a3b8; font-size: 0.85rem; margin-bottom: 1.5rem; }
+
+    bookmark-app { display: block; }
+
+    /* Toolbar */
+    .toolbar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+    .toolbar input[type="text"] {
+      flex: 1; min-width: 200px; padding: 0.5rem 0.75rem; font-size: 0.9rem;
+      background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0;
+    }
+    .toolbar input:focus { outline: none; border-color: #3b82f6; }
+    .tag-filters { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+    .tag-btn {
+      padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 99px; cursor: pointer;
+      border: 1px solid #475569; background: transparent; color: #94a3b8;
+      transition: all 0.15s;
+    }
+    .tag-btn:hover { border-color: #3b82f6; color: #e2e8f0; }
+    .tag-btn.active { background: #3b82f6; border-color: #3b82f6; color: white; }
+
+    /* Stats bar */
+    .stats {
+      display: flex; gap: 1.5rem; padding: 0.75rem 1rem; margin-bottom: 1rem;
+      background: #1e293b; border-radius: 8px; font-size: 0.85rem; color: #94a3b8;
+    }
+    .stats strong { color: #e2e8f0; }
+
+    /* Add form */
+    .add-form {
+      display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.5rem;
+      padding: 1rem; background: #1e293b; border-radius: 8px; margin-bottom: 1rem;
+    }
+    .add-form input {
+      padding: 0.5rem 0.75rem; font-size: 0.85rem;
+      background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0;
+    }
+    .add-form input:focus { outline: none; border-color: #3b82f6; }
+    .add-form button {
+      padding: 0.5rem 1rem; font-size: 0.85rem; cursor: pointer;
+      background: #3b82f6; color: white; border: none; border-radius: 6px;
+    }
+    .add-form button:hover { background: #2563eb; }
+
+    /* Bookmark list */
+    .bookmark-list { display: flex; flex-direction: column; gap: 0.4rem; }
+
+    /* Bookmark card */
+    bookmark-card { display: block; }
+    .bookmark {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.6rem 0.85rem; background: #1e293b; border-radius: 8px;
+      border-left: 3px solid #3b82f6; transition: background 0.15s;
+    }
+    .bookmark:hover { background: #273549; }
+    .bookmark .favicon {
+      width: 20px; height: 20px; border-radius: 3px; flex-shrink: 0;
+    }
+    .bookmark .info { flex: 1; min-width: 0; }
+    .bookmark .title-row { display: flex; align-items: center; gap: 0.5rem; }
+    .bookmark .title {
+      font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .bookmark a { color: #3b82f6; text-decoration: none; }
+    .bookmark a:hover { text-decoration: underline; }
+    .bookmark .url {
+      font-size: 0.75rem; color: #64748b; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .bookmark .tags { display: flex; gap: 0.25rem; flex-shrink: 0; }
+    .bookmark .tag {
+      font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 99px;
+      background: #334155; color: #94a3b8;
+    }
+    .bookmark .actions { display: flex; gap: 0.25rem; flex-shrink: 0; }
+    .bookmark button {
+      background: none; border: none; color: #64748b; cursor: pointer;
+      font-size: 0.85rem; padding: 0.2rem 0.4rem; border-radius: 4px;
+    }
+    .bookmark button:hover { background: #334155; color: #e2e8f0; }
+    .bookmark button.delete:hover { background: #ef4444; color: white; }
+
+    .empty { text-align: center; padding: 2rem; color: #64748b; }
+  </style>
+</head>
+<body>
+  <h1>📑 Bookmarks</h1>
+  <p class="subtitle">Shared store — toolbar, stats, and list all subscribe independently</p>
+  <bookmark-app></bookmark-app>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

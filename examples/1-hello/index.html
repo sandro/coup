@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>coup — hello world</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "lit-html": "https://esm.run/lit-html",
+      "lit-html/": "https://esm.run/lit-html/",
+      "coup": "../../index.js"
+    }
+  }
+  </script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 500px; margin: 2rem auto; padding: 0 1rem; }
+    h3 { margin: 0; }
+    .greeting { padding: 1rem; background: #f0f4ff; border-radius: 8px; margin-top: 0.5rem; }
+    input { padding: 0.5rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 4px; width: 100%; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <hello-app></hello-app>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,278 @@
+import { CoupElement, html, repeat } from 'coup'
+
+// ────────────────────────────────────────────────────
+// Fake data & helpers
+// ────────────────────────────────────────────────────
+
+let msgId = 100
+
+const ROOMS = ['general', 'random', 'music']
+
+const BOTS = ['Ada', 'Grace', 'Linus']
+const BOT_MESSAGES = [
+  'has anyone tried coup?', 'nice!', 'lol', 'brb', '👀', 'totally agree',
+  'that\'s a good point', 'wait what', '🎵', 'shipped it 🚀',
+  'same', 'works on my machine', '😂', '+1', 'interesting...',
+]
+
+function randomFrom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)]
+}
+
+function timestamp() {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+
+// ────────────────────────────────────────────────────
+// chat-message: a single message bubble
+// ────────────────────────────────────────────────────
+
+class ChatMessage extends CoupElement {
+  static tag = 'chat-message'
+  static props = { msg: Object, currentUser: String }
+
+  template() {
+    const m = this.msg
+    if (!m) return html``
+
+    if (m.system) {
+      return html`<div class="system-msg">${m.text}</div>`
+    }
+
+    const mine = m.author === this.currentUser
+    return html`
+      <div class="msg ${mine ? 'mine' : 'theirs'}">
+        ${!mine ? html`<div class="author">${m.author}</div>` : ''}
+        <div class="text">${m.text}</div>
+        <div class="time">${m.time}</div>
+      </div>
+    `
+  }
+}
+ChatMessage.define()
+
+
+// ────────────────────────────────────────────────────
+// chat-room: messages + compose box for a single room
+// Destroyed and re-created when switching rooms.
+// ────────────────────────────────────────────────────
+
+class ChatRoom extends CoupElement {
+  static tag = 'chat-room'
+  static props = { room: String, messages: Array, currentUser: String }
+
+  state = { typing: null }
+
+  // Fake "someone is typing" indicator — only shows when a
+  // bot message is actually incoming for THIS room
+  connected() {
+    // Listen for the bot's "pre-typing" signal
+    this._onTyping = (e) => {
+      if (e.detail.room !== this.room) return
+      this.state.typing = e.detail.author
+      this.render()
+    }
+    this._onTypingDone = (e) => {
+      if (e.detail.room !== this.room) return
+      this.state.typing = null
+      this.render()
+    }
+    window.addEventListener('chat:typing', this._onTyping)
+    window.addEventListener('chat:typing-done', this._onTypingDone)
+  }
+
+  // Clean up listeners when component is destroyed (room switch)
+  disconnected() {
+    window.removeEventListener('chat:typing', this._onTyping)
+    window.removeEventListener('chat:typing-done', this._onTypingDone)
+  }
+
+  sendMessage(e) {
+    e.preventDefault()
+    const input = this.$('input')
+    const text = input.value.trim()
+    if (!text) return
+    this.emit('chat:send', { room: this.room, text })
+    input.value = ''
+  }
+
+  // Scroll to bottom when new messages arrive
+  updated() {
+    const msgs = this.$('.messages')
+    if (msgs) msgs.scrollTop = msgs.scrollHeight
+  }
+
+  // Override render to call updated() after applying template
+  render() {
+    super.render()
+    this.updated()
+  }
+
+  template() {
+    const msgs = this.messages || []
+
+    return html`
+      <div class="chat-header"># ${this.room}</div>
+
+      <div class="messages">
+        ${repeat(
+          msgs,
+          m => m.id,
+          m => html`
+            <chat-message .msg=${m} .currentUser=${this.currentUser}></chat-message>
+          `
+        )}
+      </div>
+
+      ${this.state.typing
+        ? html`<div class="typing">${this.state.typing} is typing…</div>`
+        : ''}
+
+      <form class="compose" @submit=${(e) => this.sendMessage(e)}>
+        <input type="text" placeholder="Message #${this.room}…" />
+        <button type="submit">Send</button>
+      </form>
+    `
+  }
+}
+ChatRoom.define()
+
+
+// ────────────────────────────────────────────────────
+// chat-app: top-level — sidebar + active room
+// ────────────────────────────────────────────────────
+
+class ChatApp extends CoupElement {
+  static tag = 'chat-app'
+
+  static events = {
+    'chat:send': 'onSend',
+  }
+
+  state = {
+    user: 'you',
+    activeRoom: 'general',
+    // Messages keyed by room name
+    messages: {
+      general: [
+        { id: 1, author: 'Ada',   text: 'welcome to #general!', time: '9:00 AM', system: false },
+        { id: 2, author: 'Grace', text: 'hey everyone 👋',       time: '9:01 AM', system: false },
+      ],
+      random: [
+        { id: 3, text: 'Channel created', system: true },
+        { id: 4, author: 'Linus', text: 'first!', time: '9:15 AM', system: false },
+      ],
+      music: [
+        { id: 5, text: 'Channel created', system: true },
+      ],
+    },
+  }
+
+  constructor() {
+    super()
+    // Bots post messages every few seconds
+    this._botTimer = setInterval(() => this.botMessage(), 5000)
+  }
+
+  botMessage() {
+    const room = randomFrom(ROOMS)
+    const author = randomFrom(BOTS)
+    const text = randomFrom(BOT_MESSAGES)
+
+    // Show typing indicator first, then deliver the message
+    window.dispatchEvent(new CustomEvent('chat:typing', {
+      detail: { room, author }
+    }))
+
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('chat:typing-done', {
+        detail: { room, author }
+      }))
+
+      const msg = {
+        id: msgId++,
+        author,
+        text,
+        time: timestamp(),
+        system: false,
+      }
+      // New array reference so child prop setter sees the change
+      this.state.messages = {
+        ...this.state.messages,
+        [room]: [...this.state.messages[room], msg],
+      }
+      // Only re-render if we're viewing that room
+      if (room === this.state.activeRoom) {
+        this.render()
+      }
+    }, 1500)
+  }
+
+  switchRoom(room) {
+    if (room === this.state.activeRoom) return
+    this.state.activeRoom = room
+    this.render()
+  }
+
+  onSend(e) {
+    const { room, text } = e.detail
+    const msg = {
+      id: msgId++,
+      author: this.state.user,
+      text,
+      time: timestamp(),
+      system: false,
+    }
+    this.state.messages = {
+      ...this.state.messages,
+      [room]: [...this.state.messages[room], msg],
+    }
+    this.render()
+  }
+
+  changeUser(e) {
+    const name = e.target.value.trim()
+    if (name) {
+      this.state.user = name
+      // No render needed — it only matters on next send
+    }
+  }
+
+  template() {
+    const { activeRoom, messages, user } = this.state
+    const roomMsgs = messages[activeRoom] || []
+
+    return html`
+      <div class="sidebar">
+        <h2>Rooms</h2>
+        ${ROOMS.map(room => html`
+          <button
+            class="room-btn ${room === activeRoom ? 'active' : ''}"
+            @click=${() => this.switchRoom(room)}
+          >
+            # ${room}
+            ${messages[room]?.length ? html`<span>(${messages[room].length})</span>` : ''}
+          </button>
+        `)}
+        <div class="user-label">
+          <input
+            type="text"
+            .value=${user}
+            @change=${(e) => this.changeUser(e)}
+            placeholder="Your name"
+          />
+        </div>
+      </div>
+
+      <div class="chat-area">
+        <chat-room
+          .room=${activeRoom}
+          .messages=${roomMsgs}
+          .currentUser=${user}
+        ></chat-room>
+      </div>
+    `
+  }
+}
+ChatApp.define()

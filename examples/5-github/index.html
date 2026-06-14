@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>coup — GitHub Explorer</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "lit-html": "https://esm.run/lit-html",
+      "lit-html/": "https://esm.run/lit-html/",
+      "coup": "../../index.js"
+    }
+  }
+  </script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, system-ui, sans-serif; background: #0d1117; color: #e6edf3; padding: 24px; }
+    h1 { margin-bottom: 16px; font-size: 20px; }
+    .search-bar { display: flex; gap: 8px; margin-bottom: 24px; }
+    .search-bar input {
+      flex: 1; padding: 8px 12px; background: #161b22; border: 1px solid #30363d;
+      border-radius: 6px; color: #e6edf3; font-size: 14px; outline: none;
+    }
+    .search-bar input:focus { border-color: #58a6ff; }
+    .search-bar button {
+      padding: 8px 16px; background: #238636; border: none; border-radius: 6px;
+      color: #fff; font-weight: 600; cursor: pointer;
+    }
+    .search-bar button:hover { background: #2ea043; }
+    .search-bar button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .error { padding: 12px; background: #3d1f1f; border: 1px solid #f85149; border-radius: 6px; margin-bottom: 16px; }
+    .loading { color: #8b949e; padding: 24px; text-align: center; }
+    .user-card {
+      display: flex; gap: 16px; align-items: center; padding: 16px;
+      background: #161b22; border: 1px solid #30363d; border-radius: 8px; margin-bottom: 16px;
+    }
+    .user-card img { width: 64px; height: 64px; border-radius: 50%; }
+    .user-card h2 { font-size: 18px; }
+    .user-card a { color: #58a6ff; text-decoration: none; }
+    .user-card .stats { display: flex; gap: 16px; margin-top: 4px; color: #8b949e; font-size: 13px; }
+    .repos { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+    repo-card { display: block; padding: 16px; background: #161b22; border: 1px solid #30363d; border-radius: 8px; }
+    repo-card:hover { border-color: #58a6ff; }
+    repo-card h3 { font-size: 14px; margin-bottom: 4px; }
+    repo-card h3 a { color: #58a6ff; text-decoration: none; }
+    repo-card p { font-size: 13px; color: #8b949e; margin-bottom: 8px; line-height: 1.4; }
+    repo-card .meta { display: flex; gap: 16px; font-size: 12px; color: #8b949e; }
+    repo-card .lang-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 4px; vertical-align: middle; }
+    .empty { color: #8b949e; text-align: center; padding: 40px; }
+    .sort-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+    .sort-bar button {
+      padding: 4px 12px; background: #21262d; border: 1px solid #30363d;
+      border-radius: 20px; color: #8b949e; cursor: pointer; font-size: 12px;
+    }
+    .sort-bar button.active { background: #388bfd26; border-color: #58a6ff; color: #58a6ff; }
+  </style>
+</head>
+<body>
+  <h1>🔍 GitHub Explorer</h1>
+  <github-explorer></github-explorer>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
