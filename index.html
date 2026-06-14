@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>coup — examples</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #0a0a0a; color: #eee; padding: 2rem; max-width: 640px; margin: 0 auto; }
+    h1 { margin-bottom: 0.3rem; }
+    p { color: #888; margin-bottom: 2rem; }
+    a { color: #58a6ff; }
+    .examples { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
+    .examples li a {
+      display: block; padding: 1rem 1.25rem; background: #161b22; border: 1px solid #30363d;
+      border-radius: 8px; text-decoration: none; color: #eee; transition: border-color 0.15s;
+    }
+    .examples li a:hover { border-color: #58a6ff; }
+    .examples .name { font-weight: 600; margin-bottom: 0.25rem; }
+    .examples .desc { font-size: 0.85rem; color: #888; }
+    footer { margin-top: 2rem; color: #555; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+  <h1>coup</h1>
+  <p>~250 lines of syntactic sugar on web components + <a href="https://lit.dev/docs/libraries/standalone-templates/">lit-html</a>. You control the render loop.</p>
+
+  <ul class="examples">
+    <li><a href="examples/1-hello/">
+      <div class="name">1. Hello World</div>
+      <div class="desc">2 components, prop passing, input binding</div>
+    </a></li>
+    <li><a href="examples/2-tasks/">
+      <div class="name">2. Task List</div>
+      <div class="desc">Add, remove, reorder — keyed lists with repeat()</div>
+    </a></li>
+    <li><a href="examples/3-kanban/">
+      <div class="name">3. Kanban Board</div>
+      <div class="desc">Drag-and-drop columns, CRUD, drop preview</div>
+    </a></li>
+    <li><a href="examples/4-chat/">
+      <div class="name">4. Chat Rooms</div>
+      <div class="desc">Room switching, component destruction, timers</div>
+    </a></li>
+    <li><a href="examples/5-github/">
+      <div class="name">5. GitHub Explorer</div>
+      <div class="desc">Fetch API, async on mount, loading/error states</div>
+    </a></li>
+    <li><a href="examples/6-bookmarks/">
+      <div class="name">6. Bookmarks</div>
+      <div class="desc">Shared Store, search, tag filtering, derived data</div>
+    </a></li>
+  </ul>
+
+  <footer>
+    <a href="https://github.com/sandro/coup">Source on GitHub</a> ·
+    <a href="https://github.com/sandro/coup/blob/main/README.md">Documentation</a>
+  </footer>
+</body>
+</html>
