@@ -2,7 +2,7 @@ import { CoupElement, html, Store, repeat } from 'coup'
 import { Router } from '../../router.js'
 
 // ────────────────────────────────────────────────────
-// Store — single source of truth for bookmarks
+// Store — single source of truth for bookmarks + view state
 // ────────────────────────────────────────────────────
 
 const bookmarkStore = new Store({
@@ -16,10 +16,14 @@ const bookmarkStore = new Store({
   ],
   search: '',
   nextId: 7,
+
+  // View state — pushed in from router
+  view: 'list',       // 'list' | 'add' | '404'
+  filterTag: null,     // string | null
 })
 
 // ────────────────────────────────────────────────────
-// Router
+// Router → Store (one-way sync)
 // ────────────────────────────────────────────────────
 
 const router = new Router([
@@ -28,16 +32,29 @@ const router = new Router([
   '/tag/:tag',
 ])
 
+// Route changes push view state into the store.
+// Components only subscribe to the store — never the router.
+router.subscribe(() => {
+  if (router.pattern === null) {
+    bookmarkStore.set({ view: '404', filterTag: null })
+  } else if (router.pattern === '/add') {
+    bookmarkStore.set({ view: 'add', filterTag: null })
+  } else if (router.pattern === '/tag/:tag') {
+    bookmarkStore.set({ view: 'list', filterTag: router.params.tag })
+  } else {
+    bookmarkStore.set({ view: 'list', filterTag: null })
+  }
+})
+
 // ────────────────────────────────────────────────────
-// Derived data — computed from store + router
+// Derived data — computed from store only
 // ────────────────────────────────────────────────────
 
 function getFilteredBookmarks() {
-  const { bookmarks, search } = bookmarkStore.state
-  const tag = router.params.tag || null
+  const { bookmarks, search, filterTag } = bookmarkStore.state
   return bookmarks
     .filter(b => {
-      if (tag && !b.tags.includes(tag)) return false
+      if (filterTag && !b.tags.includes(filterTag)) return false
       if (search && !b.title.toLowerCase().includes(search.toLowerCase()) &&
           !b.url.toLowerCase().includes(search.toLowerCase())) return false
       return true
@@ -58,25 +75,15 @@ function getAllTags() {
 
 class BookmarkToolbar extends CoupElement {
   static tag = 'bookmark-toolbar'
-
-  connected() {
-    this._unsubStore = bookmarkStore.subscribe(() => this.render())
-    this._unsubRouter = router.subscribe(() => this.render())
-  }
-
-  disconnected() {
-    this._unsubStore()
-    this._unsubRouter()
-  }
+  static subscribe = [bookmarkStore]
 
   onSearch(e) {
     bookmarkStore.set({ search: e.target.value })
   }
 
   template() {
-    const { search } = bookmarkStore.state
+    const { search, filterTag } = bookmarkStore.state
     const tags = getAllTags()
-    const activeTag = router.params.tag || null
 
     return html`
       <div class="toolbar">
@@ -88,12 +95,12 @@ class BookmarkToolbar extends CoupElement {
         />
         <div class="tags">
           <a
-            class="tag-btn ${!activeTag ? 'active' : ''}"
+            class="tag-btn ${!filterTag ? 'active' : ''}"
             href="#/"
           >all</a>
           ${tags.map(tag => html`
             <a
-              class="tag-btn ${tag === activeTag ? 'active' : ''}"
+              class="tag-btn ${tag === filterTag ? 'active' : ''}"
               href="#/tag/${tag}"
             >${tag}</a>
           `)}
@@ -111,16 +118,7 @@ BookmarkToolbar.define()
 
 class BookmarkStats extends CoupElement {
   static tag = 'bookmark-stats'
-
-  connected() {
-    this._unsubStore = bookmarkStore.subscribe(() => this.render())
-    this._unsubRouter = router.subscribe(() => this.render())
-  }
-
-  disconnected() {
-    this._unsubStore()
-    this._unsubRouter()
-  }
+  static subscribe = [bookmarkStore]
 
   template() {
     const all = bookmarkStore.state.bookmarks.length
@@ -193,16 +191,7 @@ BookmarkCard.define()
 
 class BookmarkList extends CoupElement {
   static tag = 'bookmark-list'
-
-  connected() {
-    this._unsubStore = bookmarkStore.subscribe(() => this.render())
-    this._unsubRouter = router.subscribe(() => this.render())
-  }
-
-  disconnected() {
-    this._unsubStore()
-    this._unsubRouter()
-  }
+  static subscribe = [bookmarkStore]
 
   template() {
     const bookmarks = getFilteredBookmarks()
@@ -272,17 +261,12 @@ BookmarkAdd.define()
 
 class BookmarkApp extends CoupElement {
   static tag = 'bookmark-app'
-
-  connected() {
-    this._unsubRouter = router.subscribe(() => this.render())
-  }
-
-  disconnected() {
-    this._unsubRouter()
-  }
+  static subscribe = [bookmarkStore]
 
   template() {
-    if (router.pattern === null) {
+    const { view } = bookmarkStore.state
+
+    if (view === '404') {
       return html`
         <div style="padding: 2rem; text-align: center;">
           <h2>Page not found</h2>
@@ -291,19 +275,17 @@ class BookmarkApp extends CoupElement {
       `
     }
 
-    const isAdd = router.pattern === '/add'
-
     return html`
       <nav class="app-nav">
-        <a class="nav-link ${!isAdd ? 'active' : ''}" href="#/">
+        <a class="nav-link ${view === 'list' ? 'active' : ''}" href="#/">
           📑 Bookmarks
         </a>
-        <a class="nav-link ${isAdd ? 'active' : ''}" href="#/add">
+        <a class="nav-link ${view === 'add' ? 'active' : ''}" href="#/add">
           + Add New
         </a>
       </nav>
 
-      ${isAdd ? html`
+      ${view === 'add' ? html`
         <bookmark-add></bookmark-add>
       ` : html`
         <bookmark-toolbar></bookmark-toolbar>
