@@ -283,6 +283,42 @@ const debugPropResult = await page.evaluate(async () => {
 })
 assert(debugPropResult.sameRefWarning === true, 'Debug: warns on same object reference prop set')
 
+// Test 15: propsChanged fires once with all changes batched
+const propsChangedResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  const calls = []
+
+  class PropsBatch extends CoupElement {
+    static tag = 'props-batch'
+    static props = { a: String, b: String, c: Number }
+    propsChanged(changes) {
+      calls.push(structuredClone(changes))
+    }
+    template() { return html`<span>${this.a} ${this.b} ${this.c}</span>` }
+  }
+  PropsBatch.define()
+
+  const el = document.createElement('props-batch')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  // Set all three props synchronously (like lit-html does in a render pass)
+  el.a = 'hello'
+  el.b = 'world'
+  el.c = 42
+
+  // Wait for microtask batch
+  await new Promise(r => setTimeout(r, 50))
+
+  el.remove()
+  return { callCount: calls.length, changes: calls[0] }
+})
+assert(propsChangedResult.callCount === 1, `propsChanged called ${propsChangedResult.callCount} times (expected 1)`)
+assert(propsChangedResult.changes.a?.new === 'hello', 'propsChanged has a')
+assert(propsChangedResult.changes.b?.new === 'world', 'propsChanged has b')
+assert(propsChangedResult.changes.c?.new === 42, 'propsChanged has c')
+
 // Summary
 console.log('\n' + (failed ? '❌ SOME TESTS FAILED' : '🎉 All tests passed!'))
 

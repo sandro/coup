@@ -59,6 +59,8 @@ export class Store {
 
 export class CoupElement extends HTMLElement {
   _props = {}
+  _propChanges = null
+  _propChangePending = false
   _renderPending = false
   _rendering = false
   _connected = false
@@ -176,8 +178,20 @@ export class CoupElement extends HTMLElement {
           if (old !== val) {
             this._props[name] = val
             this._scheduleRender()
-            if (this._connected) {
-              this.propsChanged?.(name, old, val)
+            if (this._connected && this.propsChanged) {
+              // Batch prop changes — fire once after all props are set
+              // in a single render pass (lit-html sets .a, .b, .c sequentially)
+              if (!this._propChanges) this._propChanges = {}
+              this._propChanges[name] = { old, new: val }
+              if (!this._propChangePending) {
+                this._propChangePending = true
+                queueMicrotask(() => {
+                  const changes = this._propChanges
+                  this._propChanges = null
+                  this._propChangePending = false
+                  this.propsChanged(changes)
+                })
+              }
             }
           } else if (_debug && val !== null && typeof val === 'object') {
             warn(this.constructor.tag,
