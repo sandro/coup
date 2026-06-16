@@ -176,6 +176,9 @@ export class CoupElement extends HTMLElement {
           if (old !== val) {
             this._props[name] = val
             this._scheduleRender()
+            if (this._connected) {
+              this.propsChanged?.(name, old, val)
+            }
           } else if (_debug && val !== null && typeof val === 'object') {
             warn(this.constructor.tag,
               `prop "${name}" was set to the same object reference. ` +
