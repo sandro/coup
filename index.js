@@ -222,19 +222,21 @@ export class CoupElement extends HTMLElement {
   _applyRender() {
     if (this._rendering) return
     this._rendering = true
+    let ok = false
     try {
       const result = this.template()
       if (_debug && result === undefined) {
         warn(this.constructor.tag, 'template() returned undefined. Did you forget to return html`...`?')
       }
       litRender(result, this)
+      ok = true
     } catch (err) {
       console.error(`[coup] <${this.constructor.tag}> template() error:`, err)
     } finally {
       this._rendering = false
     }
-    // Post-render hook — safe to query/measure DOM here
-    this.updated()
+    // Post-render hook — only fires on successful render
+    if (ok) this.updated()
   }
 
   // --- Public API ---
@@ -279,8 +281,10 @@ export class CoupElement extends HTMLElement {
 
     // Fire propsChanged for any props set before connection (lit-html sets
     // props before inserting into DOM, so the setter's _connected check
-    // skips propsChanged during initial prop setting)
-    if (this.propsChanged) {
+    // skips propsChanged during initial prop setting).
+    // Only fire on first connection — not on reconnection (element moved in DOM).
+    if (this.propsChanged && !this._hasConnected) {
+      this._hasConnected = true
       const props = this.constructor.props
       if (props) {
         const initial = {}
@@ -295,6 +299,8 @@ export class CoupElement extends HTMLElement {
           queueMicrotask(() => this.propsChanged(initial))
         }
       }
+    } else {
+      this._hasConnected = true
     }
   }
 
@@ -340,13 +346,13 @@ export class CoupElement extends HTMLElement {
     const sources = this.constructor.subscribe
     if (!sources) return
     this._subs = sources.map(s => s.subscribe((newState) => {
-      // If the component defines storeChanged(), call it instead of auto-rendering.
-      // The component can do async work and call this.render() when ready.
+      // If the component defines storeChanged(), call it AND schedule a render.
+      // storeChanged can do async work or cancel the render by setting a flag,
+      // but by default the component still re-renders.
       if (this.storeChanged) {
         this.storeChanged(s, newState)
-      } else {
-        this._scheduleRender()
       }
+      this._scheduleRender()
     }))
   }
 
