@@ -419,6 +419,533 @@ assert(storeChangedResult.callCount === 2, `storeChanged called ${storeChangedRe
 assert(storeChangedResult.lastProject === 'gamma', `Last project: ${storeChangedResult.lastProject}`)
 assert(storeChangedResult.storeMatch === true, 'storeChanged receives the correct store reference')
 
+// =========================================================================
+// Hector edge-case tests — issues discovered when building a real app
+// =========================================================================
+
+// Test 19: Array-style static props create working getters/setters
+const arrayPropsResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  class ArrayProps extends CoupElement {
+    static tag = 'array-props'
+    static props = ['title', 'count']
+    template() { return html`<span>${this.title}-${this.count}</span>` }
+  }
+  ArrayProps.define()
+
+  const el = document.createElement('array-props')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  el.title = 'hello'
+  el.count = 42
+  await new Promise(r => setTimeout(r, 50))
+
+  const text = el.querySelector('span')?.textContent
+  el.remove()
+  return { text }
+})
+assert(arrayPropsResult.text === 'hello-42', `Array-style props render: "${arrayPropsResult.text}" (expected "hello-42")`)
+
+// Test 20: Array-style props fire propsChanged with initial values
+const arrayPropsInitialResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  let received = null
+
+  class ArrayPropsInit extends CoupElement {
+    static tag = 'array-props-init'
+    static props = ['name', 'value']
+    propsChanged(changes) { received = structuredClone(changes) }
+    template() { return html`<span>${this.name}=${this.value}</span>` }
+  }
+  ArrayPropsInit.define()
+
+  const el = document.createElement('array-props-init')
+  el.name = 'color'
+  el.value = 'red'
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  el.remove()
+  return { received }
+})
+assert(arrayPropsInitialResult.received !== null, 'Array props: propsChanged fired for initial props')
+assert(arrayPropsInitialResult.received.name?.new === 'color', 'Array props: initial name correct')
+assert(arrayPropsInitialResult.received.value?.new === 'red', 'Array props: initial value correct')
+
+// Test 21: propsChanged does NOT re-fire on reconnection (keyed list reorder)
+const reconnectResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  const calls = []
+
+  class ReconnectTest extends CoupElement {
+    static tag = 'reconnect-test'
+    static props = { data: String }
+    propsChanged(changes) { calls.push(structuredClone(changes)) }
+    template() { return html`<span>${this.data}</span>` }
+  }
+  ReconnectTest.define()
+
+  const el = document.createElement('reconnect-test')
+  el.data = 'hello'
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  const callsAfterMount = calls.length
+
+  // Disconnect and reconnect (simulates keyed list reorder)
+  el.remove()
+  await new Promise(r => setTimeout(r, 50))
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  el.remove()
+  return { callsAfterMount, totalCalls: calls.length }
+})
+assert(reconnectResult.callsAfterMount === 1, `propsChanged fired once on mount: ${reconnectResult.callsAfterMount}`)
+assert(reconnectResult.totalCalls === 1, `propsChanged NOT re-fired on reconnect: ${reconnectResult.totalCalls} (expected 1)`)
+
+// Test 22: updated() does NOT fire when template() throws
+const updatedErrorResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  let updatedFired = false
+  const origError = console.error
+  console.error = () => {} // suppress expected error
+
+  class BadTemplate extends CoupElement {
+    static tag = 'bad-template'
+    template() { throw new Error('intentional') }
+    updated() { updatedFired = true }
+  }
+  BadTemplate.define()
+
+  const el = document.createElement('bad-template')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  console.error = origError
+  el.remove()
+  return { updatedFired }
+})
+assert(updatedErrorResult.updatedFired === false, 'updated() does NOT fire after template() error')
+
+// Test 23: storeChanged + _scheduleRender doesn't double-render
+const doubleRenderResult = await page.evaluate(async () => {
+  const { CoupElement, Store, html } = await import('coup')
+
+  const store = new Store({ v: 0 })
+  let renderCount = 0
+
+  class DoubleRender extends CoupElement {
+    static tag = 'double-render'
+    static subscribe = [store]
+    storeChanged(s, state) {
+      // Component calls this.render() in storeChanged — old bug caused
+      // _scheduleRender to fire a second render
+      this.render()
+    }
+    template() {
+      renderCount++
+      return html`<span>${store.state.v}</span>`
+    }
+  }
+  DoubleRender.define()
+
+  const el = document.createElement('double-render')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  const rendersBefore = renderCount
+  store.set({ v: 1 })
+  await new Promise(r => setTimeout(r, 100))
+
+  const rendersAfterUpdate = renderCount - rendersBefore
+  el.remove()
+  return { rendersAfterUpdate }
+})
+assert(doubleRenderResult.rendersAfterUpdate === 1, `Store update + storeChanged render: ${doubleRenderResult.rendersAfterUpdate} renders (expected 1)`)
+
+// Test 24: Store subscription auto-renders without storeChanged
+const autoRenderResult = await page.evaluate(async () => {
+  const { CoupElement, Store, html } = await import('coup')
+
+  const store = new Store({ label: 'init' })
+
+  class AutoRender extends CoupElement {
+    static tag = 'auto-render'
+    static subscribe = [store]
+    // No storeChanged — should still auto-render
+    template() { return html`<span class="ar">${store.state.label}</span>` }
+  }
+  AutoRender.define()
+
+  const el = document.createElement('auto-render')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  const t1 = el.querySelector('.ar')?.textContent
+
+  store.set({ label: 'updated' })
+  await new Promise(r => setTimeout(r, 100))
+
+  const t2 = el.querySelector('.ar')?.textContent
+  el.remove()
+  return { t1, t2 }
+})
+assert(autoRenderResult.t1 === 'init', `Auto-render initial: "${autoRenderResult.t1}"`)
+assert(autoRenderResult.t2 === 'updated', `Auto-render after store change: "${autoRenderResult.t2}"`)
+
+// Test 25: Disconnection cleans up store subscriptions
+const disconnectSubResult = await page.evaluate(async () => {
+  const { CoupElement, Store, html } = await import('coup')
+
+  const store = new Store({ x: 0 })
+  let storeChangedAfterDisconnect = false
+
+  class DisconnectSub extends CoupElement {
+    static tag = 'disconnect-sub'
+    static subscribe = [store]
+    storeChanged(s, state) {
+      storeChangedAfterDisconnect = true
+    }
+    template() { return html`<span>${store.state.x}</span>` }
+  }
+  DisconnectSub.define()
+
+  const el = document.createElement('disconnect-sub')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  // Disconnect
+  el.remove()
+  await new Promise(r => setTimeout(r, 50))
+
+  // Reset flag
+  storeChangedAfterDisconnect = false
+
+  // Update store after disconnect — should NOT trigger storeChanged
+  store.set({ x: 99 })
+  await new Promise(r => setTimeout(r, 100))
+
+  return { storeChangedAfterDisconnect }
+})
+assert(disconnectSubResult.storeChangedAfterDisconnect === false, 'Store subscription cleaned up on disconnect')
+
+// Test 26: Multiple stores — storeChanged identifies which store changed
+const multiStoreResult = await page.evaluate(async () => {
+  const { CoupElement, Store, html } = await import('coup')
+
+  const storeA = new Store({ a: 1 })
+  const storeB = new Store({ b: 2 })
+  const calls = []
+
+  class MultiStore extends CoupElement {
+    static tag = 'multi-store'
+    static subscribe = [storeA, storeB]
+    storeChanged(store, state) {
+      if (store === storeA) calls.push({ which: 'A', state: structuredClone(state) })
+      if (store === storeB) calls.push({ which: 'B', state: structuredClone(state) })
+    }
+    template() { return html`<span>${storeA.state.a}-${storeB.state.b}</span>` }
+  }
+  MultiStore.define()
+
+  const el = document.createElement('multi-store')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  storeA.set({ a: 10 })
+  await new Promise(r => setTimeout(r, 50))
+
+  storeB.set({ b: 20 })
+  await new Promise(r => setTimeout(r, 50))
+
+  el.remove()
+  return { calls }
+})
+assert(multiStoreResult.calls.length === 2, `Multi-store: ${multiStoreResult.calls.length} calls (expected 2)`)
+assert(multiStoreResult.calls[0].which === 'A' && multiStoreResult.calls[0].state.a === 10, 'Multi-store: storeA identified')
+assert(multiStoreResult.calls[1].which === 'B' && multiStoreResult.calls[1].state.b === 20, 'Multi-store: storeB identified')
+
+// Test 27: Prop change detection — same value doesn't trigger render
+const sameValueResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  let renderCount = 0
+
+  class SameValue extends CoupElement {
+    static tag = 'same-value'
+    static props = { name: String }
+    template() {
+      renderCount++
+      return html`<span>${this.name}</span>`
+    }
+  }
+  SameValue.define()
+
+  const el = document.createElement('same-value')
+  document.body.appendChild(el)
+  el.name = 'hello'
+  await new Promise(r => setTimeout(r, 100))
+
+  const countBefore = renderCount
+
+  // Set same value — should NOT trigger render
+  el.name = 'hello'
+  await new Promise(r => setTimeout(r, 100))
+
+  el.remove()
+  return { countBefore, countAfter: renderCount }
+})
+assert(sameValueResult.countBefore === sameValueResult.countAfter, `Same value skip: renders before=${sameValueResult.countBefore} after=${sameValueResult.countAfter}`)
+
+// Test 28: Global events bind and unbind correctly
+const eventsResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  const received = []
+
+  class EventTest extends CoupElement {
+    static tag = 'event-test'
+    static events = { 'test-global-evt': 'onTestEvt' }
+    onTestEvt(e) { received.push(e.detail) }
+    template() { return html`<span>events</span>` }
+  }
+  EventTest.define()
+
+  const el = document.createElement('event-test')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  // Fire event while connected
+  window.dispatchEvent(new CustomEvent('test-global-evt', { detail: 'a' }))
+  await new Promise(r => setTimeout(r, 50))
+
+  // Disconnect
+  el.remove()
+  await new Promise(r => setTimeout(r, 50))
+
+  // Fire event after disconnect — should NOT be received
+  window.dispatchEvent(new CustomEvent('test-global-evt', { detail: 'b' }))
+  await new Promise(r => setTimeout(r, 50))
+
+  return { received }
+})
+assert(eventsResult.received.length === 1, `Events: ${eventsResult.received.length} received (expected 1)`)
+assert(eventsResult.received[0] === 'a', 'Events: received while connected')
+
+// Test 29: emit() dispatches CustomEvent on window
+const emitResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  let receivedDetail = null
+
+  class EmitTest extends CoupElement {
+    static tag = 'emit-test'
+    template() { return html`<span>emit</span>` }
+  }
+  EmitTest.define()
+
+  const el = document.createElement('emit-test')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  window.addEventListener('my-custom-evt', e => { receivedDetail = e.detail }, { once: true })
+  el.emit('my-custom-evt', { foo: 'bar' })
+  await new Promise(r => setTimeout(r, 50))
+
+  el.remove()
+  return { receivedDetail }
+})
+assert(emitResult.receivedDetail?.foo === 'bar', `emit() dispatches event with detail: ${JSON.stringify(emitResult.receivedDetail)}`)
+
+// Test 30: Store.set with function updater
+const storeFnResult = await page.evaluate(async () => {
+  const { Store } = await import('coup')
+
+  const store = new Store({ count: 5 })
+  store.set(s => ({ count: s.count + 10 }))
+  const after = store.state.count
+
+  // Ensure previous state is preserved
+  store.set(s => ({ count: s.count * 2 }))
+  const after2 = store.state.count
+
+  return { after, after2 }
+})
+assert(storeFnResult.after === 15, `Store fn updater: ${storeFnResult.after} (expected 15)`)
+assert(storeFnResult.after2 === 30, `Store fn chained: ${storeFnResult.after2} (expected 30)`)
+
+// Test 31: Store.set preserves other keys (shallow merge)
+const storeMergeResult = await page.evaluate(async () => {
+  const { Store } = await import('coup')
+
+  const store = new Store({ a: 1, b: 2, c: 3 })
+  store.set({ b: 20 })
+  return { state: structuredClone(store.state) }
+})
+assert(storeMergeResult.state.a === 1, 'Store merge: a preserved')
+assert(storeMergeResult.state.b === 20, 'Store merge: b updated')
+assert(storeMergeResult.state.c === 3, 'Store merge: c preserved')
+
+// Test 32: Store unsubscribe works
+const storeUnsubResult = await page.evaluate(async () => {
+  const { Store } = await import('coup')
+
+  const store = new Store({ x: 0 })
+  let callCount = 0
+  const unsub = store.subscribe(() => callCount++)
+
+  store.set({ x: 1 })
+  const countBefore = callCount
+
+  unsub()
+  store.set({ x: 2 })
+
+  return { countBefore, countAfter: callCount }
+})
+assert(storeUnsubResult.countBefore === 1, 'Store unsub: called before unsub')
+assert(storeUnsubResult.countAfter === 1, 'Store unsub: not called after unsub')
+
+// Test 33: Async storeChanged — no render until component calls this.render()
+const asyncStoreResult = await page.evaluate(async () => {
+  const { CoupElement, Store, html } = await import('coup')
+
+  const store = new Store({ status: 'idle' })
+  let renderCount = 0
+  let renderSnapshots = []
+
+  class AsyncStore extends CoupElement {
+    static tag = 'async-store'
+    static subscribe = [store]
+    async storeChanged(s, state) {
+      // Simulate async work (e.g. fetch from IndexedDB)
+      await new Promise(r => setTimeout(r, 80))
+      this.render()
+    }
+    template() {
+      renderCount++
+      renderSnapshots.push(store.state.status)
+      return html`<span>${store.state.status}</span>`
+    }
+  }
+  AsyncStore.define()
+
+  const el = document.createElement('async-store')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  const rendersAfterMount = renderCount
+
+  store.set({ status: 'loading' })
+
+  // Check immediately — should NOT have rendered yet (async work pending)
+  await new Promise(r => setTimeout(r, 20))
+  const rendersDuring = renderCount
+
+  // Wait for async work to complete
+  await new Promise(r => setTimeout(r, 150))
+  const rendersAfter = renderCount
+  const text = el.querySelector('span')?.textContent
+
+  el.remove()
+  return { rendersAfterMount, rendersDuring, rendersAfter, text, renderSnapshots }
+})
+assert(asyncStoreResult.rendersDuring === asyncStoreResult.rendersAfterMount,
+  `Async storeChanged: no render during async work (${asyncStoreResult.rendersDuring} === ${asyncStoreResult.rendersAfterMount})`)
+assert(asyncStoreResult.rendersAfter === asyncStoreResult.rendersAfterMount + 1,
+  `Async storeChanged: exactly 1 render after async (${asyncStoreResult.rendersAfter})`)
+assert(asyncStoreResult.text === 'loading', `Async storeChanged: DOM updated to "loading"`)
+
+// Test 34: storeChanged without this.render() — no render happens
+const noRenderResult = await page.evaluate(async () => {
+  const { CoupElement, Store, html } = await import('coup')
+
+  const store = new Store({ v: 0 })
+  let renderCount = 0
+  const sideEffects = []
+
+  class NoRenderStore extends CoupElement {
+    static tag = 'no-render-store'
+    static subscribe = [store]
+    storeChanged(s, state) {
+      // Just record the change, don't render
+      sideEffects.push(state.v)
+    }
+    template() {
+      renderCount++
+      return html`<span>${store.state.v}</span>`
+    }
+  }
+  NoRenderStore.define()
+
+  const el = document.createElement('no-render-store')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  const rendersAfterMount = renderCount
+
+  store.set({ v: 1 })
+  store.set({ v: 2 })
+  await new Promise(r => setTimeout(r, 100))
+
+  el.remove()
+  return { rendersAfterMount, rendersTotal: renderCount, sideEffects }
+})
+assert(noRenderResult.rendersTotal === noRenderResult.rendersAfterMount,
+  `storeChanged without render(): no extra renders (${noRenderResult.rendersTotal} === ${noRenderResult.rendersAfterMount})`)
+assert(noRenderResult.sideEffects.length === 2, `storeChanged without render(): side effects recorded (${noRenderResult.sideEffects})`)
+assert(noRenderResult.sideEffects[0] === 1 && noRenderResult.sideEffects[1] === 2, 'storeChanged without render(): correct values')
+
+// Test 35: Async storeChanged — multiple rapid store updates, only last render wins
+const asyncBatchResult = await page.evaluate(async () => {
+  const { CoupElement, Store, html } = await import('coup')
+
+  const store = new Store({ page: 'a' })
+  let renderCount = 0
+
+  class AsyncBatch extends CoupElement {
+    static tag = 'async-batch'
+    static subscribe = [store]
+    async storeChanged(s, state) {
+      await new Promise(r => setTimeout(r, 50))
+      this.render()
+    }
+    template() {
+      renderCount++
+      return html`<span class="ab">${store.state.page}</span>`
+    }
+  }
+  AsyncBatch.define()
+
+  const el = document.createElement('async-batch')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  const rendersAfterMount = renderCount
+
+  // Rapid-fire store updates
+  store.set({ page: 'b' })
+  store.set({ page: 'c' })
+  store.set({ page: 'd' })
+
+  // Wait for all async storeChanged to resolve
+  await new Promise(r => setTimeout(r, 200))
+
+  const text = el.querySelector('.ab')?.textContent
+
+  el.remove()
+  return { rendersAfterMount, rendersTotal: renderCount, text }
+})
+assert(asyncBatchResult.text === 'd', `Async batch: final DOM shows "d" (got "${asyncBatchResult.text}")`)
+// Each store.set triggers a separate storeChanged, each awaits and renders — 3 renders
+assert(asyncBatchResult.rendersTotal === asyncBatchResult.rendersAfterMount + 3,
+  `Async batch: 3 renders for 3 updates (${asyncBatchResult.rendersTotal - asyncBatchResult.rendersAfterMount})`)
+
 // Summary
 console.log('\n' + (failed ? '❌ SOME TESTS FAILED' : '🎉 All tests passed!'))
 

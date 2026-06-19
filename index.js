@@ -166,7 +166,14 @@ export class CoupElement extends HTMLElement {
     const props = this.constructor.props
     if (!props) return
 
-    for (const [name, _type] of Object.entries(props)) {
+    // Support both object and array forms:
+    //   static props = { name: String, count: Number }
+    //   static props = ['name', 'count']
+    const entries = Array.isArray(props)
+      ? props.map(name => [name, String])
+      : Object.entries(props)
+
+    for (const [name, _type] of entries) {
       this._props[name] = undefined
 
       Object.defineProperty(this, name, {
@@ -212,6 +219,7 @@ export class CoupElement extends HTMLElement {
     if (this._renderPending) return
     this._renderPending = true
     queueMicrotask(() => {
+      if (!this._renderPending) return  // already rendered (e.g. manual render() call)
       this._renderPending = false
       if (this._connected) {
         this._applyRender()
@@ -222,6 +230,7 @@ export class CoupElement extends HTMLElement {
   _applyRender() {
     if (this._rendering) return
     this._rendering = true
+    this._renderPending = false  // clear so scheduled microtask is a no-op
     let ok = false
     try {
       const result = this.template()
@@ -289,7 +298,8 @@ export class CoupElement extends HTMLElement {
       if (props) {
         const initial = {}
         let hasInitial = false
-        for (const name of Object.keys(props)) {
+        const names = Array.isArray(props) ? props : Object.keys(props)
+        for (const name of names) {
           if (this._props[name] !== undefined) {
             initial[name] = { old: undefined, new: this._props[name] }
             hasInitial = true
@@ -346,13 +356,14 @@ export class CoupElement extends HTMLElement {
     const sources = this.constructor.subscribe
     if (!sources) return
     this._subs = sources.map(s => s.subscribe((newState) => {
-      // If the component defines storeChanged(), call it AND schedule a render.
-      // storeChanged can do async work or cancel the render by setting a flag,
-      // but by default the component still re-renders.
       if (this.storeChanged) {
+        // Component owns the render — call this.render() when ready.
+        // Async storeChanged just works: do your awaits, render when done.
         this.storeChanged(s, newState)
+      } else {
+        // No storeChanged defined — auto-render.
+        this._scheduleRender()
       }
-      this._scheduleRender()
     }))
   }
 
