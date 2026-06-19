@@ -233,6 +233,8 @@ export class CoupElement extends HTMLElement {
     } finally {
       this._rendering = false
     }
+    // Post-render hook — safe to query/measure DOM here
+    this.updated()
   }
 
   // --- Public API ---
@@ -274,6 +276,26 @@ export class CoupElement extends HTMLElement {
     this._bindSubscriptions()
     this._scheduleRender()
     this.connected()
+
+    // Fire propsChanged for any props set before connection (lit-html sets
+    // props before inserting into DOM, so the setter's _connected check
+    // skips propsChanged during initial prop setting)
+    if (this.propsChanged) {
+      const props = this.constructor.props
+      if (props) {
+        const initial = {}
+        let hasInitial = false
+        for (const name of Object.keys(props)) {
+          if (this._props[name] !== undefined) {
+            initial[name] = { old: undefined, new: this._props[name] }
+            hasInitial = true
+          }
+        }
+        if (hasInitial) {
+          queueMicrotask(() => this.propsChanged(initial))
+        }
+      }
+    }
   }
 
   disconnectedCallback() {
@@ -288,6 +310,10 @@ export class CoupElement extends HTMLElement {
 
   /** Called when the element is removed from the DOM. Override freely — no super needed. */
   disconnected() {}
+
+  /** Called after every render (DOM is up to date). Override for post-render work like
+   *  measuring elements, initializing third-party widgets, or scrolling. */
+  updated() {}
 
   // --- Subscriptions ---
   //
@@ -313,7 +339,15 @@ export class CoupElement extends HTMLElement {
   _bindSubscriptions() {
     const sources = this.constructor.subscribe
     if (!sources) return
-    this._subs = sources.map(s => s.subscribe(() => this._scheduleRender()))
+    this._subs = sources.map(s => s.subscribe((newState) => {
+      // If the component defines storeChanged(), call it instead of auto-rendering.
+      // The component can do async work and call this.render() when ready.
+      if (this.storeChanged) {
+        this.storeChanged(s, newState)
+      } else {
+        this._scheduleRender()
+      }
+    }))
   }
 
   _unbindSubscriptions() {

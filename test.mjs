@@ -319,6 +319,106 @@ assert(propsChangedResult.changes.a?.new === 'hello', 'propsChanged has a')
 assert(propsChangedResult.changes.b?.new === 'world', 'propsChanged has b')
 assert(propsChangedResult.changes.c?.new === 42, 'propsChanged has c')
 
+// Test 16: propsChanged fires for initial props set before connection
+const initialPropsResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+  
+  let received = null
+
+  class InitProps extends CoupElement {
+    static tag = 'init-props'
+    static props = { name: String, count: Number }
+    propsChanged(changes) { received = structuredClone(changes) }
+    template() { return html`<span>${this.name} ${this.count}</span>` }
+  }
+  InitProps.define()
+
+  const el = document.createElement('init-props')
+  // Set props BEFORE adding to DOM (this is what lit-html does)
+  el.name = 'hello'
+  el.count = 42
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  el.remove()
+  return { received }
+})
+assert(initialPropsResult.received !== null, 'propsChanged fired for initial props')
+assert(initialPropsResult.received.name?.new === 'hello', 'initial props has name')
+assert(initialPropsResult.received.count?.new === 42, 'initial props has count')
+
+// Test 17: updated() fires after every render
+const updatedResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  let updateCount = 0
+  let domContent = null
+
+  class UpdatedTest extends CoupElement {
+    static tag = 'updated-test'
+    state = { val: 'first' }
+    updated() {
+      updateCount++
+      // DOM should reflect the latest render
+      domContent = this.querySelector('span')?.textContent
+    }
+    template() { return html`<span>${this.state.val}</span>` }
+  }
+  UpdatedTest.define()
+
+  const el = document.createElement('updated-test')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  const countAfterMount = updateCount
+
+  el.state.val = 'second'
+  el.render()
+  await new Promise(r => setTimeout(r, 50))
+
+  el.remove()
+  return { countAfterMount, totalCount: updateCount, domContent }
+})
+assert(updatedResult.countAfterMount >= 1, `updated() fired on mount: ${updatedResult.countAfterMount}`)
+assert(updatedResult.totalCount >= 2, `updated() fired again after render: ${updatedResult.totalCount}`)
+assert(updatedResult.domContent === 'second', `DOM was current in updated(): "${updatedResult.domContent}"`)
+
+// Test 18: storeChanged() callback on store subscription
+const storeChangedResult = await page.evaluate(async () => {
+  const { CoupElement, Store, html } = await import('coup')
+
+  const testStore = new Store({ project: 'alpha' })
+  const calls = []
+
+  class StoreCallback extends CoupElement {
+    static tag = 'store-callback'
+    static subscribe = [testStore]
+    storeChanged(store, newState) {
+      calls.push({ store: store === testStore, project: newState.project })
+      // Component decides when to render
+      this.render()
+    }
+    template() { return html`<span>${testStore.state.project}</span>` }
+  }
+  StoreCallback.define()
+
+  const el = document.createElement('store-callback')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  testStore.set({ project: 'beta' })
+  await new Promise(r => setTimeout(r, 50))
+
+  testStore.set({ project: 'gamma' })
+  await new Promise(r => setTimeout(r, 50))
+
+  el.remove()
+  return { callCount: calls.length, lastProject: calls[calls.length - 1]?.project, storeMatch: calls[0]?.store }
+})
+assert(storeChangedResult.callCount === 2, `storeChanged called ${storeChangedResult.callCount} times (expected 2)`)
+assert(storeChangedResult.lastProject === 'gamma', `Last project: ${storeChangedResult.lastProject}`)
+assert(storeChangedResult.storeMatch === true, 'storeChanged receives the correct store reference')
+
 // Summary
 console.log('\n' + (failed ? '❌ SOME TESTS FAILED' : '🎉 All tests passed!'))
 
