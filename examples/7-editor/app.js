@@ -7,6 +7,54 @@ import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
+import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
+import AutoJoiner from 'tiptap-extension-auto-joiner'
+
+// Simple HTML formatter — no dependencies, handles nesting and self-closing tags
+const VOID_TAGS = new Set(['area','base','br','col','embed','hr','img','input','link','meta','source','track','wbr'])
+function prettyHTML(src) {
+  // Normalize: collapse whitespace between tags, trim
+  let s = src.replace(/>\s+</g, '><').trim()
+  const tokens = []
+  let i = 0
+  // Tokenize into tags and text
+  while (i < s.length) {
+    if (s[i] === '<') {
+      const end = s.indexOf('>', i)
+      if (end === -1) { tokens.push(s.slice(i)); break }
+      tokens.push(s.slice(i, end + 1))
+      i = end + 1
+    } else {
+      const next = s.indexOf('<', i)
+      if (next === -1) { tokens.push(s.slice(i)); break }
+      tokens.push(s.slice(i, next))
+      i = next
+    }
+  }
+  // Build indented output
+  let indent = 0
+  const lines = []
+  const INDENT = '  '
+  for (const tok of tokens) {
+    if (tok.startsWith('</')) {
+      // Closing tag — dedent then print
+      indent = Math.max(0, indent - 1)
+      lines.push(INDENT.repeat(indent) + tok)
+    } else if (tok.startsWith('<')) {
+      // Opening or self-closing tag
+      const m = tok.match(/^<(\w+)/)
+      const tagName = m ? m[1].toLowerCase() : ''
+      const selfClose = tok.endsWith('/>') || VOID_TAGS.has(tagName)
+      lines.push(INDENT.repeat(indent) + tok)
+      if (!selfClose) indent++
+    } else {
+      // Text node
+      const text = tok.trim()
+      if (text) lines.push(INDENT.repeat(indent) + text)
+    }
+  }
+  return lines.join('\n')
+}
 
 // CodeMirror — lazy-loaded when code view opens
 let cmModules = null
@@ -244,9 +292,25 @@ class CodeView extends CoupElement {
     })
   }
 
+  formatHTML() {
+    if (!this._cm) return
+    const raw = this._cm.state.doc.toString()
+    const formatted = prettyHTML(raw)
+    if (formatted === raw) return
+    this._updating = true
+    this._cm.dispatch({
+      changes: { from: 0, to: this._cm.state.doc.length, insert: formatted },
+    })
+    this._updating = false
+    this.emit('code:changed', formatted)
+  }
+
   template() {
     return html`
-      <div class="code-pane-header">HTML</div>
+      <div class="code-pane-header">
+        <span>HTML</span>
+        <button class="format-btn" @click=${() => this.formatHTML()} title="Format HTML">Format</button>
+      </div>
       <div class="code-editor-mount" style="flex:1; overflow:auto;"></div>
     `
   }
@@ -309,6 +373,13 @@ class BlockEditor extends CoupElement {
         Underline,
         Image.configure({ inline: false, allowBase64: true }),
         Placeholder.configure({ placeholder: 'Start writing…' }),
+        GlobalDragHandle.configure({
+          dragHandleWidth: 20,
+          scrollTreshold: 100,
+        }),
+        AutoJoiner.configure({
+          elementsToJoin: ['bulletList', 'orderedList'],
+        }),
       ],
       content: INITIAL_CONTENT.trim(),
       onUpdate: ({ editor }) => {
