@@ -215,6 +215,7 @@
       <a href="#gotchas">Common Mistakes</a>
       <a href="#deployment">Deployment</a>
       <div class="section-label">Patterns</div>
+      <a href="#extending">Extending CoupElement</a>
       <a href="#p-animations">Animations</a>
       <a href="#p-async">Async Data</a>
       <a href="#p-forms">Forms</a>
@@ -1201,6 +1202,85 @@ php -S localhost:<span class="num">3000</span></code></pre>
 
       <!-- ================================================================ -->
       <!-- PATTERNS -->
+      <!-- ================================================================ -->
+
+      <h2 id="extending">Pattern: Extending CoupElement</h2>
+      <p>Coup is a class. You can subclass it. If every component in your app needs the same capabilities — abort control, toast notifications, a shared fetch helper — create your own base class and extend that instead of <code>CoupElement</code> directly. The framework is a starting point, not a ceiling.</p>
+
+      <h3>Example: automatic fetch cancellation</h3>
+      <p>Most apps have components that fetch data. When the component is removed (navigated away, tab switched), in-flight requests should be cancelled. Instead of writing <code>AbortController</code> boilerplate in every component, bake it into a base class:</p>
+
+      <pre><code><span class="cm">// base.js — your app's base class</span>
+<span class="kw">import</span> { CoupElement } <span class="kw">from</span> <span class="str">'coup'</span>
+
+<span class="kw">class</span> AppElement <span class="kw">extends</span> CoupElement {
+  <span class="cm">// Always available — returns the current signal</span>
+  get abortSignal() {
+    <span class="kw">if</span> (!<span class="kw">this</span>._abort) <span class="kw">this</span>._abort = <span class="kw">new</span> AbortController()
+    <span class="kw">return</span> <span class="kw">this</span>._abort.signal
+  }
+
+  <span class="cm">// Cancel in-flight work, return a fresh signal</span>
+  abort() {
+    <span class="kw">this</span>._abort?.abort()
+    <span class="kw">this</span>._abort = <span class="kw">new</span> AbortController()
+    <span class="kw">return</span> <span class="kw">this</span>._abort.signal
+  }
+
+  disconnectedCallback() {
+    <span class="kw">this</span>._abort?.abort()  <span class="cm">// auto-cancel on removal</span>
+    <span class="kw">super</span>.disconnectedCallback()
+  }
+}
+
+<span class="kw">export</span> { AppElement }</code></pre>
+
+      <p>Now every component gets cancellation for free:</p>
+
+      <pre><code><span class="kw">import</span> { AppElement } <span class="kw">from</span> <span class="str">'./base.js'</span>
+
+<span class="kw">class</span> UserProfile <span class="kw">extends</span> AppElement {
+  <span class="kw">static</span> tag = <span class="str">'user-profile'</span>
+  <span class="kw">static</span> props = { userId: String }
+
+  state = { user: <span class="kw">null</span>, loading: <span class="kw">true</span> }
+
+  <span class="kw">async</span> connected() {
+    <span class="kw">await</span> <span class="kw">this</span>.loadUser()
+  }
+
+  propsChanged(changes) {
+    <span class="kw">if</span> (<span class="str">'userId'</span> <span class="kw">in</span> changes) <span class="kw">this</span>.loadUser()
+  }
+
+  <span class="kw">async</span> loadUser() {
+    <span class="kw">const</span> signal = <span class="kw">this</span>.abort()  <span class="cm">// cancel previous, get fresh signal</span>
+    <span class="kw">this</span>.state.loading = <span class="kw">true</span>
+    <span class="kw">this</span>.render()
+    <span class="kw">try</span> {
+      <span class="kw">const</span> res = <span class="kw">await</span> fetch(<span class="str">`/api/users/${this.userId}`</span>, { signal })
+      <span class="kw">this</span>.state.user = <span class="kw">await</span> res.json()
+    } <span class="kw">catch</span> (e) {
+      <span class="kw">if</span> (e.name === <span class="str">'AbortError'</span>) <span class="kw">return</span>  <span class="cm">// cancelled — do nothing</span>
+      <span class="kw">throw</span> e
+    }
+    <span class="kw">this</span>.state.loading = <span class="kw">false</span>
+    <span class="kw">this</span>.render()
+  }
+
+  template() { <span class="cm">/* ... */</span> }
+}</code></pre>
+
+      <p>No cleanup in <code>disconnected()</code>. No manual <code>AbortController</code> management. Navigate away mid-fetch and the request is cancelled automatically.</p>
+
+      <h3>Other things worth adding to a base class</h3>
+      <ul>
+        <li><code>async fetchJSON(url)</code> — wraps fetch + signal + JSON parsing + error handling in one call</li>
+        <li><code>toast(message)</code> — emits a global event that a toast component listens for</li>
+        <li><code>track(event, data)</code> — analytics wrapper</li>
+      </ul>
+      <p>Keep the base class small. If only some components need a capability, use composition (import a function) instead of inheritance (put it in the base class).</p>
+
       <!-- ================================================================ -->
 
       <h2 id="p-animations">Pattern: Animations</h2>
