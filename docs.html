@@ -103,14 +103,35 @@
       transition: background 0.15s;
     }
     .example-header button:hover { background: #2ea043; }
+    .example-source {
+      position: relative;
+    }
+    .example-source .hl-layer,
     .example-source textarea {
       width: 100%; min-height: 140px;
-      background: #0d1117; color: #c9d1d9;
+      background: #0d1117;
       border: none; padding: 0.8rem 1rem;
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
       font-size: 0.8rem; line-height: 1.6;
-      resize: vertical; outline: none; tab-size: 2;
+      tab-size: 2; white-space: pre; overflow: auto;
+      margin: 0;
     }
+    .example-source .hl-layer {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none; color: #c9d1d9;
+    }
+    .example-source textarea {
+      position: relative; z-index: 1;
+      color: transparent; caret-color: #c9d1d9;
+      resize: vertical; outline: none;
+      background: transparent;
+    }
+    /* Syntax token colors */
+    .hl-kw { color: #ff7b72; }
+    .hl-str { color: #a5d6ff; }
+    .hl-cm { color: #8b949e; font-style: italic; }
+    .hl-fn { color: #d2a8ff; }
+    .hl-num { color: #79c0ff; }
     .example-preview {
       border-top: 1px solid #21262d; background: #fff; color: #1a1a1a;
       min-height: 50px;
@@ -624,34 +645,34 @@ unsub()</code></pre>
         <script type="text/plain">
 import { CoupElement, html } from 'coup'
 
-class GithubUser extends CoupElement {
-  static tag = 'github-user'
-  state = { user: null, loading: true }
+class SFWeather extends CoupElement {
+  static tag = 'sf-weather'
+  state = { weather: null, loading: true }
 
   async connected() {
-    const res = await fetch('https://api.github.com/users/sandro')
-    this.state.user = await res.json()
+    const res = await fetch(
+      'https://api.open-meteo.com/v1/forecast?latitude=37.77&longitude=-122.42&current=temperature_2m,weathercode&temperature_unit=fahrenheit'
+    )
+    this.state.weather = await res.json()
     this.state.loading = false
     this.render()
   }
 
   template() {
     if (this.state.loading) return html`<p>Loading...</p>`
-    const u = this.state.user
+    const c = this.state.weather.current
+    const icons = {0:'☀️',1:'🌤',2:'⛅',3:'☁️',45:'🌫',51:'🌦',61:'🌧',71:'❄️',95:'⛈'}
+    const icon = icons[c.weathercode] || '🌡️'
     return html`
-      <div style="display:flex; align-items:center; gap:0.75rem;">
-        <img src=${u.avatar_url} width="48" height="48" style="border-radius:50%;">
-        <div>
-          <strong>${u.name}</strong>
-          <div style="font-size:0.85rem; color:#666;">${u.public_repos} repos · ${u.followers} followers</div>
-        </div>
+      <div style="font-size:1.5rem;">
+        ${icon} San Francisco: ${c.temperature_2m}°F
       </div>
     `
   }
 }
-GithubUser.define()
+SFWeather.define()
 
-document.body.appendChild(document.createElement('github-user'))
+document.body.appendChild(document.createElement('sf-weather'))
         </script>
       </doc-example>
 
@@ -807,7 +828,7 @@ template() {
       <p style="color:#8b949e; text-align:center; margin-top:2rem; padding-top:1rem; border-top:1px solid #21262d;">
         <a href="./" style="color:#58a6ff;">Home</a> ·
         <a href="https://github.com/sandro/coup" style="color:#58a6ff;">Source</a> ·
-        ~250 lines · That's a coup.
+        That's a coup.
       </p>
     </main>
   </div>
@@ -816,11 +837,52 @@ template() {
     import { CoupElement, html } from 'coup'
 
     // =========================================================================
+    // Lightweight JS/HTML syntax highlighter — no dependencies
+    // =========================================================================
+    function highlight(code) {
+      const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      const KW = /^(import|from|export|default|const|let|var|class|extends|static|return|if|else|new|async|await|this|function|true|false|null|undefined|typeof|instanceof|super|for|of|in|while|do|switch|case|break|continue|throw|try|catch|finally|void|delete|yield)$/
+      const tokens = []
+      // Single pass tokenizer — order matters, first match wins
+      const rx = /('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`)|(\/\/.*$)|(\d+\.?\d*)\b|(\b\w+)\s*\(|\b(\w+)\b/gm
+      let m
+      while ((m = rx.exec(code)) !== null) {
+        let cls
+        if (m[1]) cls = 'hl-str'           // string literal
+        else if (m[2]) cls = 'hl-cm'       // comment
+        else if (m[3]) cls = 'hl-num'      // number
+        else if (m[4]) cls = m[4] === 'html' ? 'hl-kw' : 'hl-fn' // function call
+        else if (m[5] && KW.test(m[5])) cls = 'hl-kw' // keyword
+        else continue
+        tokens.push({ from: m.index, to: m.index + m[0].length, text: m[0], cls })
+      }
+      // Build output — non-overlapping tokens only
+      let out = '', last = 0
+      for (const t of tokens) {
+        if (t.from < last) continue
+        out += esc(code.slice(last, t.from))
+        // For function calls, only color the name part
+        if (t.cls === 'hl-fn') {
+          const name = t.text.match(/^(\w+)/)[1]
+          out += '<span class="' + t.cls + '">' + esc(name) + '</span>' + esc(t.text.slice(name.length))
+        } else {
+          out += '<span class="' + t.cls + '">' + esc(t.text) + '</span>'
+        }
+        last = t.to
+      }
+      out += esc(code.slice(last))
+      return out
+    }
+
+    // =========================================================================
     // <doc-example> — live editable code example, powered by coup
     //
     // Reads source from a <script type="text/plain"> child.
     // Runs it in a sandboxed iframe with coup available via importmap.
     // Edit the code, hit Run (or Cmd+Enter), see it render.
+    //
+    // Uses a transparent textarea overlaid on a syntax-highlighted <pre> so
+    // you get real editing (selections, undo, clipboard) with colored tokens.
     // =========================================================================
     class DocExample extends CoupElement {
       static tag = 'doc-example'
@@ -831,16 +893,12 @@ template() {
         // Read code from the <script type="text/plain"> child
         const script = this.querySelector('script[type="text/plain"]')
         if (script) {
-          // Trim leading/trailing blank lines, dedent
           const lines = script.textContent.split('\n')
-          // Remove leading/trailing empty lines
           while (lines.length && !lines[0].trim()) lines.shift()
           while (lines.length && !lines[lines.length - 1].trim()) lines.pop()
-          // Find minimum indentation
           const indent = Math.min(...lines.filter(l => l.trim()).map(l => l.match(/^(\s*)/)[1].length))
           this.state.code = lines.map(l => l.slice(indent)).join('\n')
         }
-        // Auto-run after first render
         requestAnimationFrame(() => this.run())
       }
 
@@ -864,6 +922,16 @@ template() {
         this.state.ran = true
       }
 
+      _syncHighlight(e) {
+        const pre = this.$('.hl-layer')
+        if (pre) pre.innerHTML = highlight(e.target.value) + '\n'
+        // Sync scroll
+        if (pre) {
+          pre.scrollTop = e.target.scrollTop
+          pre.scrollLeft = e.target.scrollLeft
+        }
+      }
+
       template() {
         const label = this.getAttribute('label') || 'Live Example'
         return html`
@@ -872,8 +940,14 @@ template() {
             <button @click=${() => this.run()}>▶ Run</button>
           </div>
           <div class="example-source">
+            <pre class="hl-layer">${{ _$litType$: undefined, strings: [highlight(this.state.code) + '\n'], values: [] }}</pre>
             <textarea spellcheck="false"
               .value=${this.state.code}
+              @input=${(e) => this._syncHighlight(e)}
+              @scroll=${(e) => {
+                const pre = this.$('.hl-layer')
+                if (pre) { pre.scrollTop = e.target.scrollTop; pre.scrollLeft = e.target.scrollLeft }
+              }}
               @keydown=${(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                   e.preventDefault()
@@ -884,6 +958,7 @@ template() {
                   const t = e.target
                   const start = t.selectionStart
                   t.setRangeText('  ', start, t.selectionEnd, 'end')
+                  this._syncHighlight({ target: t })
                 }
               }}></textarea>
           </div>
@@ -891,6 +966,12 @@ template() {
             <iframe sandbox="allow-scripts allow-same-origin"></iframe>
           </div>
         `
+      }
+
+      updated() {
+        // Set innerHTML for the highlighted layer (lit-html escapes HTML)
+        const pre = this.$('.hl-layer')
+        if (pre) pre.innerHTML = highlight(this.state.code) + '\n'
       }
     }
     DocExample.define()
