@@ -246,9 +246,9 @@ document.body.appendChild(document.createElement('my-counter'))
         <tbody>
           <tr><td><code>CoupElement</code></td><td>coup</td><td>Base class for components</td></tr>
           <tr><td><code>Store</code></td><td>coup</td><td>Observable state container</td></tr>
-          <tr><td><code>html</code>, <code>svg</code></td><td>lit-html</td><td>Tagged template functions for DOM</td></tr>
-          <tr><td><code>nothing</code></td><td>lit-html</td><td>Render-nothing sentinel</td></tr>
-          <tr><td><code>repeat</code></td><td>lit-html</td><td>Keyed list rendering</td></tr>
+          <tr><td><code>html</code>, <code>svg</code></td><td><a href="https://lit.dev/docs/libraries/standalone-templates/" target="_blank">lit-html</a></td><td>Tagged template functions for DOM</td></tr>
+          <tr><td><code>nothing</code></td><td><a href="https://lit.dev/docs/libraries/standalone-templates/" target="_blank">lit-html</a></td><td>Render-nothing sentinel</td></tr>
+          <tr><td><code>repeat</code></td><td><a href="https://lit.dev/docs/libraries/standalone-templates/" target="_blank">lit-html</a></td><td>Keyed list rendering</td></tr>
         </tbody>
       </table>
 
@@ -266,7 +266,7 @@ UserCard.<span class="fn">define</span>()</code></pre>
 
       <!-- ================================================================ -->
       <h2 id="template">template()</h2>
-      <p>Return your component's markup using lit-html's <code>html</code> tagged template. Called internally on each render.</p>
+      <p>Return your component's markup using <a href="https://lit.dev/docs/libraries/standalone-templates/" target="_blank">lit-html</a>'s <code>html</code> tagged template. Called internally on each render.</p>
 
       <pre><code>template() {
   <span class="kw">return</span> html<span class="str">`
@@ -275,7 +275,7 @@ UserCard.<span class="fn">define</span>()</code></pre>
   `</span>
 }</code></pre>
 
-      <p>Use <code>${expression}</code> for dynamic values. lit-html only updates the parts that changed — no virtual DOM diffing.</p>
+      <p>Use <code>${expression}</code> for dynamic values. <a href="https://lit.dev/docs/libraries/standalone-templates/" target="_blank">lit-html</a> only updates the parts that changed — no virtual DOM diffing.</p>
 
       <!-- ================================================================ -->
       <h2 id="render">render()</h2>
@@ -810,7 +810,7 @@ router.<span class="fn">destroy</span>()  <span class="cm">// clean up listeners
       <p>Dispatches a <code>CustomEvent</code> on <code>window</code>. See <a href="#emit" style="color:#58a6ff;">Events</a>.</p>
 
       <h3><code>repeat(items, keyFn, template)</code></h3>
-      <p>Re-exported from lit-html. Renders keyed lists — essential for reordering and animations.</p>
+      <p>Re-exported from <a href="https://lit.dev/docs/templates/lists/#the-repeat-directive" target="_blank">lit-html</a>. Renders keyed lists — essential for reordering and animations.</p>
 
       <pre><code><span class="kw">import</span> { repeat } <span class="kw">from</span> <span class="str">'coup'</span>
 
