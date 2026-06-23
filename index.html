@@ -3,58 +3,365 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>coup — examples</title>
+  <title>coup — a coup against the tyranny of the modern frontend</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: system-ui, sans-serif; background: #0a0a0a; color: #eee; padding: 2rem; max-width: 640px; margin: 0 auto; }
-    h1 { margin-bottom: 0.3rem; }
-    p { color: #888; margin-bottom: 2rem; }
-    a { color: #58a6ff; }
-    .examples { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
-    .examples li a {
-      display: block; padding: 1rem 1.25rem; background: #161b22; border: 1px solid #30363d;
-      border-radius: 8px; text-decoration: none; color: #eee; transition: border-color 0.15s;
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0a0a0a;
+      color: #eee;
+      padding: 2rem 1.5rem;
+      max-width: 720px;
+      margin: 0 auto;
+      line-height: 1.7;
     }
-    .examples li a:hover { border-color: #58a6ff; }
-    .examples .name { font-weight: 600; margin-bottom: 0.25rem; }
-    .examples .desc { font-size: 0.85rem; color: #888; }
-    footer { margin-top: 2rem; color: #555; font-size: 0.8rem; }
+
+    a { color: #58a6ff; }
+
+    /* --- Hero --- */
+    .hero {
+      padding: 4rem 0 3rem;
+      text-align: center;
+    }
+    .hero h1 {
+      font-size: 4rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      margin-bottom: 0.75rem;
+    }
+    .hero .tagline {
+      font-size: 1.25rem;
+      color: #aaa;
+      font-weight: 400;
+    }
+
+    /* --- Sections --- */
+    section {
+      margin-bottom: 3.5rem;
+    }
+    section h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 1.25rem;
+      color: #eee;
+    }
+    section p {
+      color: #b0b0b0;
+      margin-bottom: 1rem;
+      font-size: 1rem;
+    }
+    section p:last-child {
+      margin-bottom: 0;
+    }
+    section p strong, section p em.bright {
+      color: #eee;
+      font-style: normal;
+    }
+
+    /* --- Code blocks --- */
+    pre {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      overflow-x: auto;
+      font-size: 0.875rem;
+      line-height: 1.6;
+      margin: 1.25rem 0;
+    }
+    pre code {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      color: #e6edf3;
+    }
+    code {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      background: #161b22;
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+      font-size: 0.9em;
+      color: #e6edf3;
+    }
+
+    .comment { color: #8b949e; }
+    .keyword { color: #ff7b72; }
+    .string { color: #a5d6ff; }
+    .func { color: #d2a8ff; }
+    .tag { color: #7ee787; }
+    .punct { color: #8b949e; }
+
+    /* --- Lifecycle list --- */
+    .hooks {
+      list-style: none;
+      padding: 0;
+      margin: 1.25rem 0;
+    }
+    .hooks li {
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #1c2128;
+      color: #b0b0b0;
+    }
+    .hooks li:last-child {
+      border-bottom: none;
+    }
+    .hooks li code {
+      color: #d2a8ff;
+      margin-right: 0.5rem;
+    }
+
+    /* --- Examples list --- */
+    .examples {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+    }
+    .examples li a {
+      display: block;
+      padding: 1rem 1.25rem;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      text-decoration: none;
+      color: #eee;
+      transition: border-color 0.15s;
+    }
+    .examples li a:hover {
+      border-color: #58a6ff;
+    }
+    .examples .name {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    .examples .desc {
+      font-size: 0.85rem;
+      color: #888;
+    }
+
+    /* --- Footer --- */
+    footer {
+      margin-top: 3rem;
+      padding-top: 2rem;
+      border-top: 1px solid #1c2128;
+      color: #555;
+      font-size: 0.85rem;
+    }
+    footer a {
+      color: #58a6ff;
+    }
+
+    /* --- Misc --- */
+    hr {
+      border: none;
+      border-top: 1px solid #1c2128;
+      margin: 3rem 0;
+    }
   </style>
 </head>
 <body>
-  <h1>coup</h1>
-  <p>~250 lines of syntactic sugar on web components + <a href="https://lit.dev/docs/libraries/standalone-templates/">lit-html</a>. You control the render loop.</p>
 
-  <ul class="examples">
-    <li><a href="examples/1-hello/">
-      <div class="name">1. Hello World</div>
-      <div class="desc">2 components, prop passing, input binding</div>
-    </a></li>
-    <li><a href="examples/2-tasks/">
-      <div class="name">2. Task List</div>
-      <div class="desc">Add, remove, reorder — keyed lists with repeat()</div>
-    </a></li>
-    <li><a href="examples/3-kanban/">
-      <div class="name">3. Kanban Board</div>
-      <div class="desc">Drag-and-drop columns, CRUD, drop preview</div>
-    </a></li>
-    <li><a href="examples/4-chat/">
-      <div class="name">4. Chat Rooms</div>
-      <div class="desc">Room switching, component destruction, timers</div>
-    </a></li>
-    <li><a href="examples/5-github/">
-      <div class="name">5. GitHub Explorer</div>
-      <div class="desc">Fetch API, async on mount, loading/error states</div>
-    </a></li>
-    <li><a href="examples/6-bookmarks/">
-      <div class="name">6. Bookmarks</div>
-      <div class="desc">Shared Store, search, tag filtering, derived data</div>
-    </a></li>
-  </ul>
+  <!-- Hero -->
+  <div class="hero">
+    <h1>coup</h1>
+    <p class="tagline">A coup against the tyranny of the modern frontend.</p>
+  </div>
+
+  <!-- The Crime -->
+  <section>
+    <h2>The crime</h2>
+    <p>
+      Somewhere along the way, building a button that says "clicked 3 times" started requiring
+      a bundler, a transpiler, a framework, a state management library, and 200MB of
+      <code>node_modules</code> heavier than the application they exist to serve.
+      Build pipelines now take longer to configure than the feature they enable.
+    </p>
+    <p>
+      Reactivity models got so complex that frameworks ship dedicated devtools to help you
+      debug <em class="bright">their own rendering</em>. Think about that. The framework can't
+      explain itself without a browser extension.
+    </p>
+    <p>
+      The frameworks created problems that didn't exist before them — <strong>stale closures,
+      zombie children, render cascades, hydration mismatches</strong> — then sold us the solutions:
+      <code>useMemo</code>, <code>useCallback</code>, <code>React.memo</code>, <code>Suspense</code>.
+      An industry of problems that only exist inside the tool meant to solve them.
+    </p>
+  </section>
+
+  <!-- The Lie -->
+  <section>
+    <h2>The lie</h2>
+    <p>
+      The central lie of modern frontend is: <strong>"you cannot be trusted with the render loop."</strong>
+    </p>
+    <p>
+      React, Vue, Svelte, Angular — they all decide <em class="bright">when</em> to render for you.
+      They call it "declarative." They say it frees you to think about <em>what</em> instead of <em>when</em>.
+    </p>
+    <p>
+      But every performance issue you've ever debugged was a <em class="bright">when</em> problem.
+      <em>Why did this re-render?</em> Why did the whole tree update when one input changed?
+      Then you spend your afternoon wrapping things in <code>memo</code> and <code>useCallback</code>,
+      manually telling the framework <strong>when not to render</strong> — which is just telling it
+      when to render, with extra steps and a dependency array you have to maintain by hand.
+    </p>
+    <p>
+      The framework took away your control, then gave you back a worse version of it
+      and called it an optimization API.
+    </p>
+  </section>
+
+  <!-- The Counter-offer -->
+  <section>
+    <h2>The counter-offer</h2>
+    <p>What if you just… called <code>render()</code> when you were ready?</p>
+    <pre><code><span class="keyword">import</span> { CoupElement, html } <span class="keyword">from</span> <span class="string">'coup'</span>
+
+<span class="keyword">class</span> <span class="func">TodoList</span> <span class="keyword">extends</span> CoupElement {
+  <span class="keyword">static</span> tag = <span class="string">'todo-list'</span>
+
+  state = { items: [], text: <span class="string">''</span> }
+
+  <span class="func">addItem</span>() {
+    <span class="keyword">if</span> (!<span class="keyword">this</span>.state.text.trim()) <span class="keyword">return</span>
+    <span class="keyword">this</span>.state.items.push(<span class="keyword">this</span>.state.text)
+    <span class="keyword">this</span>.state.text = <span class="string">''</span>
+    <span class="keyword">this</span>.<span class="func">render</span>()
+  }
+
+  <span class="func">template</span>() {
+    <span class="keyword">return</span> html<span class="string">`
+      &lt;input
+        .value=</span><span class="punct">${</span><span class="keyword">this</span>.state.text<span class="punct">}</span><span class="string">
+        @input=</span><span class="punct">${</span>e => <span class="keyword">this</span>.state.text = e.target.value<span class="punct">}</span><span class="string">
+      &gt;
+      &lt;button @click=</span><span class="punct">${</span>() => <span class="keyword">this</span>.<span class="func">addItem</span>()<span class="punct">}</span><span class="string">&gt;Add&lt;/button&gt;
+      &lt;ul&gt;
+        </span><span class="punct">${</span><span class="keyword">this</span>.state.items.map(i => html<span class="string">`&lt;li&gt;</span><span class="punct">${</span>i<span class="punct">}</span><span class="string">&lt;/li&gt;`</span>)<span class="punct">}</span><span class="string">
+      &lt;/ul&gt;
+    `</span>
+  }
+}
+
+TodoList.<span class="func">define</span>()</code></pre>
+    <p>
+      No hidden machinery. No dependency arrays. No stale closures. No rules of hooks.
+      You changed state, called <code>render()</code>, lit-html diffed the template,
+      and the DOM updated. <strong>Done.</strong>
+    </p>
+  </section>
+
+  <!-- What coup is -->
+  <section>
+    <h2>What coup is</h2>
+    <p>
+      <strong>~250 lines of code.</strong> That's the entire framework — not just the "core,"
+      not the "runtime," not the part before the plugins load. The whole thing.
+      You can read it in one sitting, understand every line, and never wonder what happens
+      between your state change and the DOM update.
+    </p>
+    <p>
+      The "build system" is an <code>&lt;script type="importmap"&gt;</code>:
+    </p>
+    <pre><code><span class="tag">&lt;script</span> <span class="string">type="importmap"</span><span class="tag">&gt;</span>
+{
+  <span class="string">"imports"</span>: {
+    <span class="string">"lit-html"</span>: <span class="string">"https://esm.sh/lit-html@3"</span>,
+    <span class="string">"lit-html/"</span>: <span class="string">"https://esm.sh/lit-html@3/"</span>,
+    <span class="string">"coup"</span>: <span class="string">"./index.js"</span>
+  }
+}
+<span class="tag">&lt;/script&gt;</span>
+<span class="tag">&lt;script</span> <span class="string">type="module"</span> <span class="string">src="app.js"</span><span class="tag">&gt;&lt;/script&gt;</span></code></pre>
+    <p>
+      No <code>npm install</code>. No <code>webpack.config.js</code>. No <code>vite.config.ts</code>.
+      No <code>next.config.mjs</code>. Open the HTML file. It works.
+    </p>
+    <p>
+      Under the hood, coup uses <strong>custom elements</strong> — the browser's own component system.
+      Shipped in every browser since 2020. Ignored by an industry addicted to compilation.
+    </p>
+  </section>
+
+  <!-- Lifecycle -->
+  <section>
+    <h2>Lifecycle you can hold in your head</h2>
+    <p>Five hooks. No dependency arrays. No cleanup-return-function guessing games.</p>
+    <ul class="hooks">
+      <li><code>connected()</code> Element added to the DOM. Set up your state, start timers, fetch data.</li>
+      <li><code>propsChanged(changes)</code> One or more props changed. You get an object with <code>{ propName: { old, new } }</code>.</li>
+      <li><code>storeChanged(store, state)</code> A subscribed Store updated. You decide if and when to render.</li>
+      <li><code>updated()</code> DOM just re-rendered. Measure elements, init third-party widgets, scroll.</li>
+      <li><code>disconnected()</code> Element removed. Clean up whatever you started.</li>
+    </ul>
+    <p>
+      Compare with React's <code>useEffect</code> — a single hook that handles mounting,
+      updating, <em>and</em> cleanup, distinguished only by what you put in the dependency array.
+      Miss a dependency? Stale closure. Include too many? Infinite loop.
+      The old class component lifecycle had <code>componentDidMount</code>,
+      <code>componentDidUpdate</code>, <code>componentWillUnmount</code>,
+      <code>getDerivedStateFromProps</code>, <code>shouldComponentUpdate</code>,
+      <code>getSnapshotBeforeUpdate</code>… a carousel of methods nobody memorized.
+    </p>
+    <p>
+      Coup's lifecycle is five methods that do what their names say. No surprises.
+    </p>
+  </section>
+
+  <!-- The proof -->
+  <section>
+    <h2>The proof</h2>
+    <p>
+      Seven runnable examples. No installs. No builds. Click and read the source.
+      Every one is a single HTML file with an importmap and vanilla JavaScript.
+    </p>
+
+    <ul class="examples">
+      <li><a href="examples/1-hello/">
+        <div class="name">1. Hello World</div>
+        <div class="desc">2 components, prop passing, input binding</div>
+      </a></li>
+      <li><a href="examples/2-tasks/">
+        <div class="name">2. Task List</div>
+        <div class="desc">Add, remove, reorder — keyed lists with repeat()</div>
+      </a></li>
+      <li><a href="examples/3-kanban/">
+        <div class="name">3. Kanban Board</div>
+        <div class="desc">Drag-and-drop columns, CRUD, drop preview</div>
+      </a></li>
+      <li><a href="examples/4-chat/">
+        <div class="name">4. Chat Rooms</div>
+        <div class="desc">Room switching, component destruction, timers</div>
+      </a></li>
+      <li><a href="examples/5-github/">
+        <div class="name">5. GitHub Explorer</div>
+        <div class="desc">Fetch API, async on mount, loading/error states</div>
+      </a></li>
+      <li><a href="examples/6-bookmarks/">
+        <div class="name">6. Bookmarks</div>
+        <div class="desc">Shared Store, search, tag filtering, derived data</div>
+      </a></li>
+      <li><a href="examples/7-editor/">
+        <div class="name">7. Block Editor</div>
+        <div class="desc">Block editor — Tiptap + CodeMirror, bidirectional sync</div>
+      </a></li>
+    </ul>
+  </section>
+
+  <!-- Get started -->
+  <section>
+    <h2>Get started</h2>
+    <pre><code><span class="comment"># No install. No build. No wait.</span>
+git clone https://github.com/sandro/coup.git
+<span class="keyword">cd</span> coup
+open index.html</code></pre>
+  </section>
 
   <footer>
     <a href="https://github.com/sandro/coup">Source on GitHub</a> ·
     <a href="https://github.com/sandro/coup/blob/main/README.md">Documentation</a>
   </footer>
+
 </body>
 </html>
