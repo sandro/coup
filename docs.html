@@ -65,6 +65,8 @@
 
     p { margin-bottom: 0.8rem; color: #adbac7; }
     strong { color: #e6edf3; }
+    a { color: #58a6ff; }
+    a:hover { color: #79c0ff; }
     code {
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
       background: #161b22; padding: 0.15em 0.4em; border-radius: 3px;
@@ -247,6 +249,7 @@ document.body.appendChild(document.createElement('my-counter'))
 
       <!-- ================================================================ -->
       <h2 id="exports">Exports</h2>
+      <p>Everything you need comes from one import. No separate packages, no peer dependencies, no version matrix.</p>
 
       <pre><code><span class="kw">import</span> { CoupElement, Store, html, svg, nothing, repeat } <span class="kw">from</span> <span class="str">'coup'</span></code></pre>
 
@@ -263,7 +266,8 @@ document.body.appendChild(document.createElement('my-counter'))
 
       <!-- ================================================================ -->
       <h2 id="defining">Defining Components</h2>
-      <p>Every component extends <code>CoupElement</code> and registers itself with a hyphenated tag name.</p>
+      <p>A coup component is just a class that extends <code>CoupElement</code>. Give it a tag name with a hyphen (that's a web component rule, not ours), write a <code>template()</code> method, and call <code>define()</code> to register it with the browser.</p>
+      <p>After that, you can use it in HTML like any other element — because it <em>is</em> an element.</p>
 
       <pre><code><span class="kw">class</span> <span class="fn">UserCard</span> <span class="kw">extends</span> CoupElement {
   <span class="kw">static</span> tag = <span class="str">'user-card'</span>
@@ -271,11 +275,11 @@ document.body.appendChild(document.createElement('my-counter'))
 }
 UserCard.<span class="fn">define</span>()</code></pre>
 
-      <p><code>define()</code> calls <code>customElements.define(tag, this)</code>. The tag must contain a hyphen (web component spec).</p>
+      <p><code>define()</code> registers your class with the browser as a custom element. Once defined, you can use <code>&lt;user-card&gt;</code> anywhere in your HTML — the browser knows what it is.</p>
 
       <!-- ================================================================ -->
       <h2 id="template">template()</h2>
-      <p>Return your component's markup using <a href="https://lit.dev/docs/libraries/standalone-templates/" target="_blank">lit-html</a>'s <code>html</code> tagged template. Called internally on each render.</p>
+      <p>This is where your component's HTML lives. Write it using <a href="https://lit.dev/docs/libraries/standalone-templates/" target="_blank">lit-html</a>'s <code>html</code> tagged template — it looks like regular HTML, but you can drop in JavaScript expressions with <code>${...}</code>. Whenever coup renders your component, it calls <code>template()</code> and efficiently updates only the parts of the DOM that actually changed.</p>
 
       <pre><code>template() {
   <span class="kw">return</span> html<span class="str">`
@@ -284,11 +288,11 @@ UserCard.<span class="fn">define</span>()</code></pre>
   `</span>
 }</code></pre>
 
-      <p>Use <code>${expression}</code> for dynamic values. <a href="https://lit.dev/docs/libraries/standalone-templates/" target="_blank">lit-html</a> only updates the parts that changed — no virtual DOM diffing.</p>
+      <p>The <code>${...}</code> expressions can be strings, numbers, other <code>html</code> templates, arrays — whatever your UI needs. <a href="https://lit.dev/docs/libraries/standalone-templates/" target="_blank">lit-html</a> remembers where each expression is in the DOM and only touches those spots on re-render. No virtual DOM, no full-tree diffing.</p>
 
       <!-- ================================================================ -->
       <h2 id="render">render()</h2>
-      <p>Call <code>this.render()</code> to push your template to the DOM. This is the core of coup — <strong>you decide when to render</strong>.</p>
+      <p>This is the big idea. In most frameworks, the framework decides when to re-render your component — and you spend half your time figuring out why it rendered when it shouldn't have. In coup, <strong>you</strong> call <code>this.render()</code> when you want the DOM to update. Changed some state? Call <code>this.render()</code>. Finished an async operation? Call <code>this.render()</code>. It's explicit, it's visible in your code, and there are zero surprises.</p>
 
       <doc-example label="Toggle — explicit render on state change">
         <script type="text/plain">
@@ -327,7 +331,7 @@ document.body.appendChild(document.createElement('toggle-box'))
 
       <!-- ================================================================ -->
       <h2 id="props">Props</h2>
-      <p><code>static props</code> declares reactive properties. When a parent sets a prop, the component auto-re-renders.</p>
+      <p>Props are how parent components pass data to children. Declare them with <code>static props</code>, and coup creates getters and setters for you. When a parent changes a prop, the child automatically re-renders — no manual <code>this.render()</code> needed. Props are the one place where coup <em>does</em> auto-render, because the parent is in control.</p>
 
       <pre><code><span class="kw">class</span> <span class="fn">UserCard</span> <span class="kw">extends</span> CoupElement {
   <span class="kw">static</span> tag = <span class="str">'user-card'</span>
@@ -341,9 +345,9 @@ document.body.appendChild(document.createElement('toggle-box'))
 <span class="cm">// Parent passes props via lit-html property binding:</span>
 html<span class="str">`&lt;user-card .name=${'Ada'} .role=${'Engineer'}&gt;&lt;/user-card&gt;`</span></code></pre>
 
-      <p>Multiple prop changes in the same microtask coalesce into a single render. Props use strict equality (<code>===</code>) — same value means no re-render.</p>
+      <p>If a parent sets three props at once (which lit-html does when rendering), coup batches them into a single re-render instead of three. And if you set a prop to the same value it already has, nothing happens — no wasted renders.</p>
 
-      <p>Array-style declaration also works: <code>static props = ['name', 'role']</code></p>
+      <p>Don't need types? Array-style works too: <code>static props = ['name', 'role']</code></p>
 
       <doc-example label="Props — parent passes data, child auto-renders">
         <script type="text/plain">
@@ -392,7 +396,7 @@ document.body.appendChild(document.createElement('color-picker'))
 
       <!-- ================================================================ -->
       <h2 id="attrs">Attributes</h2>
-      <p><code>static attrs</code> maps HTML attributes to reactive values via <code>attributeChangedCallback</code>.</p>
+      <p>Sometimes you want to set values directly in HTML, like <code>&lt;status-badge status="online"&gt;</code>. That's what attributes are for. Declare them with <code>static attrs</code>, and coup will watch for attribute changes and coerce the string value to the right type. If you declare the same name in both <code>static attrs</code> and <code>static props</code>, attribute changes automatically flow through to the prop system (including auto-re-rendering).</p>
 
       <pre><code><span class="kw">class</span> <span class="fn">StatusBadge</span> <span class="kw">extends</span> CoupElement {
   <span class="kw">static</span> tag = <span class="str">'status-badge'</span>
@@ -405,7 +409,7 @@ document.body.appendChild(document.createElement('color-picker'))
   }
 }</code></pre>
 
-      <p>When both <code>static attrs</code> and <code>static props</code> declare the same name, attribute changes set the prop (triggering auto-re-render).</p>
+      <p>The bridge between HTML attributes (always strings) and JavaScript props (any type) is automatic. Set an attribute in HTML, and the right prop updates with the right type.</p>
 
       <table>
         <thead><tr><th>Type</th><th>Coercion</th></tr></thead>
@@ -418,7 +422,7 @@ document.body.appendChild(document.createElement('color-picker'))
 
       <!-- ================================================================ -->
       <h2 id="events">Events</h2>
-      <p><code>static events</code> auto-binds window-level event listeners. They're cleaned up when the component disconnects.</p>
+      <p>Need to listen for keyboard shortcuts, custom events from other components, or browser events? Declare them in <code>static events</code> and coup handles the rest — listeners are added when your component connects to the DOM and removed when it disconnects. No manual <code>addEventListener</code>/<code>removeEventListener</code> bookkeeping. No leaked listeners.</p>
 
       <doc-example label="Events — listen to window events, auto-cleanup on disconnect">
         <script type="text/plain">
@@ -456,7 +460,7 @@ document.body.appendChild(document.createElement('key-logger'))
 
       <!-- ================================================================ -->
       <h2 id="emit">emit()</h2>
-      <p>Dispatch a <code>CustomEvent</code> on <code>window</code>. Other components listen via <code>static events</code>.</p>
+      <p>The flip side of <code>static events</code>. When a component needs to tell the world something happened, it calls <code>this.emit()</code>. This fires a <code>CustomEvent</code> on <code>window</code>, and any component with a matching <code>static events</code> entry hears it. No event bus library. No prop drilling callbacks through five layers. Just emit and listen.</p>
 
       <pre><code><span class="cm">// Child emits:</span>
 this.<span class="fn">emit</span>(<span class="str">'item:selected'</span>, { id: <span class="num">42</span> })
@@ -468,7 +472,7 @@ this.<span class="fn">emit</span>(<span class="str">'item:selected'</span>, { id
   console.log(e.detail.id) <span class="cm">// 42</span>
 }</code></pre>
 
-      <p>Events flow through <code>window</code>, so any component anywhere can listen. Pub/sub with zero setup.</p>
+      <p>Events flow through <code>window</code>, so any component anywhere in your app can listen — even if they're in completely different parts of the DOM tree. It's pub/sub built into the browser.</p>
 
       <doc-example label="emit() — child sends events, parent listens">
         <script type="text/plain">
@@ -522,7 +526,7 @@ document.body.appendChild(document.createElement('color-display'))
 
       <!-- ================================================================ -->
       <h2 id="store">Store</h2>
-      <p>A lightweight observable state container. ~15 lines. Use it when components need shared state.</p>
+      <p>When two or more components need to read and write the same data, put it in a Store. A Store holds your state, notifies subscribers when it changes, and that's it. No reducers, no actions, no selectors, no middleware. Create a store, read <code>.state</code>, call <code>.set()</code> to update it.</p>
 
       <doc-example label="Store — shared state across components">
         <script type="text/plain">
@@ -591,7 +595,7 @@ unsub()</code></pre>
 
       <!-- ================================================================ -->
       <h2 id="subscribe">static subscribe</h2>
-      <p>Auto-wire store subscriptions. The component re-renders when any subscribed store changes.</p>
+      <p>Connecting a component to a store is one line. Declare <code>static subscribe = [myStore]</code> and coup will automatically re-render your component whenever that store updates. Subscribe to as many stores as you need — each change triggers a re-render so your UI stays in sync.</p>
 
       <pre><code><span class="kw">class</span> <span class="fn">Dashboard</span> <span class="kw">extends</span> CoupElement {
   <span class="kw">static</span> tag = <span class="str">'app-dashboard'</span>
@@ -602,11 +606,11 @@ unsub()</code></pre>
   }
 }</code></pre>
 
-      <p>Subscriptions are cleaned up automatically on disconnect. Works with any object that has a <code>subscribe(fn) → unsubscribe</code> contract.</p>
+      <p>When your component disconnects from the DOM, subscriptions are cleaned up automatically — no memory leaks. And this isn't limited to coup's Store. Anything with a <code>subscribe(fn) → unsubscribe</code> contract works: a router, a websocket wrapper, whatever you build.</p>
 
       <!-- ================================================================ -->
       <h2 id="store-changed">storeChanged()</h2>
-      <p>Define <code>storeChanged</code> and <strong>you own the render</strong>. Coup won't auto-render — call <code>this.render()</code> when you're ready. Async storeChanged just works.</p>
+      <p>Sometimes a store change means you need to do work <em>before</em> rendering — fetch data from an API, read from IndexedDB, run a computation. Define <code>storeChanged(store, newState)</code> and coup hands you full control. It won't auto-render; you call <code>this.render()</code> when your async work is done. This is the async-friendly pattern that makes coup great for real apps.</p>
 
       <pre><code><span class="kw">async</span> <span class="fn">storeChanged</span>(store, newState) {
   <span class="cm">// Do async work — fetch, IndexedDB, whatever</span>
@@ -615,15 +619,15 @@ unsub()</code></pre>
   this.<span class="fn">render</span>()  <span class="cm">// render when ready, not before</span>
 }</code></pre>
 
-      <p>The contract:</p>
+      <p>The rule is simple:</p>
       <ul>
-        <li>No <code>storeChanged</code> → auto-render on store change</li>
-        <li><code>storeChanged</code> defined → you call <code>this.render()</code> when ready</li>
+        <li><strong>No <code>storeChanged</code> defined?</strong> Coup auto-renders when the store changes. Zero effort.</li>
+        <li><strong><code>storeChanged</code> defined?</strong> You're in charge. Do your async work, call <code>this.render()</code> when the data is ready. Coup stays out of your way.</li>
       </ul>
 
       <!-- ================================================================ -->
       <h2 id="lifecycle">Lifecycle</h2>
-      <p>Five hooks. That's it.</p>
+      <p>A component's life is a straight line, not a flowchart. Five hooks cover everything from birth to death. Compare that to React's <code>useEffect</code> dependency arrays or Angular's change detection strategies — coup gives you a hook for each moment that matters and nothing else.</p>
 
       <div class="lifecycle">
         constructor<br>
@@ -648,7 +652,7 @@ unsub()</code></pre>
 
       <!-- ================================================================ -->
       <h2 id="connected">connected()</h2>
-      <p>Called when the element enters the DOM. Fetch data, start timers, set up.</p>
+      <p>Your component just appeared in the DOM. This is where you do setup work — fetch data from an API, start an interval timer, initialize a third-party library. It's the equivalent of React's <code>componentDidMount</code> or the "run once on mount" <code>useEffect</code>, except it's just a method with a clear name.</p>
 
       <doc-example label="connected() — fetch data on mount">
         <script type="text/plain">
@@ -687,7 +691,7 @@ document.body.appendChild(document.createElement('sf-weather'))
 
       <!-- ================================================================ -->
       <h2 id="disconnected">disconnected()</h2>
-      <p>Called when the element leaves the DOM. Clean up timers, listeners, connections.</p>
+      <p>Your component just left the DOM. Clean up anything you started in <code>connected()</code> — clear timers, close websockets, release resources. This always fires, even if the component was removed by a parent re-render. No leaked intervals, no orphaned listeners.</p>
 
       <pre><code><span class="fn">connected</span>() {
   this._interval = setInterval(() => {
@@ -702,7 +706,7 @@ document.body.appendChild(document.createElement('sf-weather'))
 
       <!-- ================================================================ -->
       <h2 id="props-changed">propsChanged()</h2>
-      <p>Fires when parent-set props change. Receives a batch of all changes in the current microtask.</p>
+      <p>When a parent component changes your props, <code>propsChanged</code> fires with every change batched into one call. You get an object showing what changed — old values, new values, all at once. This is where you trigger side effects like fetching new data when an ID prop changes.</p>
 
       <pre><code><span class="fn">propsChanged</span>(changes) {
   <span class="cm">// changes = { propName: { old: prevValue, new: newValue }, ... }</span>
@@ -711,11 +715,11 @@ document.body.appendChild(document.createElement('sf-weather'))
   }
 }</code></pre>
 
-      <p>No need to call <code>this.render()</code> — prop changes already trigger auto-render. Use <code>propsChanged</code> for side effects like data fetching.</p>
+      <p>You don't need to call <code>this.render()</code> here — prop changes already trigger an automatic re-render. Think of <code>propsChanged</code> as a notification: "hey, your inputs changed, do anything you need to do." The render happens for you.</p>
 
       <!-- ================================================================ -->
       <h2 id="updated">updated()</h2>
-      <p>Fires after a successful render. DOM measurements, scroll positioning, third-party widget init.</p>
+      <p>The DOM just updated. This is the moment to do things that need the real DOM to be ready — measure an element's height, scroll a chat window to the bottom, tell CodeMirror to refresh, initialize a chart. If you've used React, this is like the "after paint" part of <code>useEffect</code> — but it only fires after a <strong>successful</strong> render. If your <code>template()</code> threw an error, <code>updated()</code> is skipped.</p>
 
       <pre><code><span class="fn">updated</span>() {
   <span class="cm">// DOM is up to date — safe to measure or init widgets</span>
@@ -723,30 +727,23 @@ document.body.appendChild(document.createElement('sf-weather'))
   <span class="kw">if</span> (el) el.scrollTop = el.scrollHeight
 }</code></pre>
 
-      <p>Only fires after a <strong>successful</strong> render. If <code>template()</code> throws, <code>updated()</code> is skipped.</p>
+
 
       <!-- ================================================================ -->
       <h2 id="router">Router</h2>
-      <p>Hash-based SPA router. No server config. Works on GitHub Pages.</p>
+      <p>A tiny hash-based router for single-page apps. It uses <code>#/path</code> URLs, which means it works on any static file server — GitHub Pages, S3, Nginx, <code>python -m http.server</code> — with zero configuration. No server-side rewrites, no catch-all routes. Just push your HTML and go.</p>
 
-      <doc-example label="Router — hash-based navigation">
+      <doc-example label="Router — page switching">
         <script type="text/plain">
 import { CoupElement, html } from 'coup'
 
-class MiniApp extends CoupElement {
-  static tag = 'mini-app'
-  state = { page: location.hash.slice(2) || 'home' }
+class MiniRouter extends CoupElement {
+  static tag = 'mini-router'
+  state = { page: 'home' }
 
-  connected() {
-    this._onHash = () => {
-      this.state.page = location.hash.slice(2) || 'home'
-      this.render()
-    }
-    window.addEventListener('hashchange', this._onHash)
-  }
-
-  disconnected() {
-    window.removeEventListener('hashchange', this._onHash)
+  go(page) {
+    this.state.page = page
+    this.render()
   }
 
   template() {
@@ -755,7 +752,7 @@ class MiniApp extends CoupElement {
     return html`
       <nav style="display:flex; gap:1rem; margin-bottom:0.75rem;">
         ${pages.map(p => html`
-          <a href="#/${p}"
+          <a @click=${() => this.go(p)}
              style="color:${page === p ? '#339af0' : '#555'}; text-decoration:none;
                     font-weight:${page === p ? '600' : '400'}; cursor:pointer;">
             ${p}
@@ -764,15 +761,15 @@ class MiniApp extends CoupElement {
       </nav>
       <div style="padding:0.75rem; background:#f8f9fa; border-radius:4px;">
         ${page === 'home' ? html`<p>🏠 Welcome home.</p>` : ''}
-        ${page === 'about' ? html`<p>ℹ️ coup is ~250 lines. You're reading them.</p>` : ''}
+        ${page === 'about' ? html`<p>ℹ️ About coup. You're reading the docs.</p>` : ''}
         ${page === 'contact' ? html`<p>📬 Open an issue on GitHub.</p>` : ''}
       </div>
     `
   }
 }
-MiniApp.define()
+MiniRouter.define()
 
-document.body.appendChild(document.createElement('mini-app'))
+document.body.appendChild(document.createElement('mini-router'))
         </script>
       </doc-example>
 
@@ -795,7 +792,7 @@ router.<span class="fn">destroy</span>()  <span class="cm">// clean up listeners
 
       <!-- ================================================================ -->
       <h2 id="debug">Debug Mode</h2>
-      <p>One switch. Warns about common mistakes.</p>
+      <p>Flip one switch and coup watches your back. It logs warnings when you mutate state without rendering, when your template returns a stale reference, or when prop identity might cause unexpected re-renders. Turn it on during development, turn it off in production.</p>
 
       <pre><code>CoupElement.debug = <span class="kw">true</span>
 
@@ -808,18 +805,18 @@ router.<span class="fn">destroy</span>()  <span class="cm">// clean up listeners
       <h2 id="helpers">Helpers</h2>
 
       <h3><code>$(selector)</code></h3>
-      <p>Shortcut for <code>this.querySelector(selector)</code>.</p>
+      <p>A convenience shortcut for <code>this.querySelector(selector)</code>. Grab a child element without the verbosity.</p>
       <pre><code><span class="kw">const</span> input = this.<span class="fn">$</span>(<span class="str">'input.name'</span>)</code></pre>
 
       <h3><code>$$(selector)</code></h3>
-      <p>Shortcut for <code>[...this.querySelectorAll(selector)]</code>. Returns a real <code>Array</code>.</p>
+      <p>Like <code>$()</code> but returns all matches as a real <code>Array</code> (not a NodeList), so you can <code>.map()</code>, <code>.filter()</code>, and <code>.forEach()</code> directly.</p>
       <pre><code>this.<span class="fn">$$</span>(<span class="str">'.item'</span>).<span class="fn">forEach</span>(el => el.classList.add(<span class="str">'active'</span>))</code></pre>
 
       <h3><code>emit(name, detail)</code></h3>
-      <p>Dispatches a <code>CustomEvent</code> on <code>window</code>. See <a href="#emit" style="color:#58a6ff;">Events</a>.</p>
+      <p>Fires a <code>CustomEvent</code> on <code>window</code> with the given name and detail payload. Any component with a matching <code>static events</code> entry will hear it. See <a href="#emit">Events</a> above for the full pattern.</p>
 
       <h3><code>repeat(items, keyFn, template)</code></h3>
-      <p>Re-exported from <a href="https://lit.dev/docs/templates/lists/#the-repeat-directive" target="_blank">lit-html</a>. Renders keyed lists — essential for reordering and animations.</p>
+      <p>Re-exported from <a href="https://lit.dev/docs/templates/lists/#the-repeat-directive" target="_blank">lit-html</a>. When you're rendering a list and items can be added, removed, or reordered, use <code>repeat()</code> with a key function. This tells lit-html how to track each item, so it moves DOM nodes instead of recreating them. Essential for drag-and-drop, animations, and any list where order matters.</p>
 
       <pre><code><span class="kw">import</span> { repeat } <span class="kw">from</span> <span class="str">'coup'</span>
 
