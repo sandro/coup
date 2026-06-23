@@ -94,7 +94,7 @@
     .example-header {
       display: flex; justify-content: space-between; align-items: center;
       padding: 0.4rem 0.75rem; background: #161b22; border-bottom: 1px solid #21262d;
-      font-size: 0.75rem; color: #8b949e;
+      font-size: 0.75rem; color: #c9d1d9; font-weight: 500;
     }
     .example-header button {
       background: #238636; color: #fff; border: none;
@@ -133,10 +133,19 @@
     .hl-fn { color: #d2a8ff; }
     .hl-num { color: #79c0ff; }
     .example-preview {
-      border-top: 1px solid #21262d; background: #fff; color: #1a1a1a;
-      min-height: 50px;
+      border-top: 1px solid #21262d;
     }
-    .example-preview iframe { width: 100%; border: none; min-height: 60px; background: #fff; display: block; }
+    .example-preview-header {
+      display: flex; align-items: center;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.7rem; color: #8b949e; letter-spacing: 0.02em;
+      background: #161b22; border-bottom: 1px solid #21262d;
+    }
+    .example-preview iframe {
+      width: 100%; border: none; min-height: 60px;
+      background: #fff; display: block;
+      border-radius: 0 0 5px 5px;
+    }
 
     /* Lifecycle diagram */
     .lifecycle {
@@ -920,6 +929,18 @@ template() {
 
         iframe.srcdoc = doc
         this.state.ran = true
+        // Auto-resize iframe to fit content
+        iframe.onload = () => {
+          const resize = () => {
+            try {
+              const h = iframe.contentDocument.documentElement.scrollHeight
+              iframe.style.height = Math.max(60, h) + 'px'
+            } catch(e) {}
+          }
+          resize()
+          setTimeout(resize, 500)  // catch async renders
+          setTimeout(resize, 2000) // catch slow fetches
+        }
       }
 
       _syncHighlight(e) {
@@ -963,6 +984,7 @@ template() {
               }}></textarea>
           </div>
           <div class="example-preview">
+            <div class="example-preview-header">Output</div>
             <iframe sandbox="allow-scripts allow-same-origin"></iframe>
           </div>
         `
