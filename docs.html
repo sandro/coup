@@ -997,14 +997,18 @@ html<span class="str">`&lt;status-badge status="online"&gt;&lt;/status-badge&gt;
 html<span class="str">`&lt;user-card user=${this.state.user}&gt;&lt;/user-card&gt;`</span></code></pre>
 
       <h3>Event handlers</h3>
-      <pre><code><span class="cm">// Inline arrow function</span>
+      <pre><code><span class="cm">// Arrow wrapper — always works</span>
 html<span class="str">`&lt;button @click=${() => this.save()}&gt;Save&lt;/button&gt;`</span>
-
-<span class="cm">// With the event object</span>
-html<span class="str">`&lt;input @input=${(e) => { this.state.q = e.target.value; this.render() }}&gt;`</span>
 
 <span class="cm">// Prevent default (forms, links)</span>
 html<span class="str">`&lt;form @submit=${(e) => { e.preventDefault(); this.send() }}&gt;`</span></code></pre>
+
+      <p><strong>Binding tip:</strong> passing a regular method directly (<code>@click=$&#123;this.save&#125;</code>) won't work — <code>this</code> gets lost. Either wrap it in an arrow, or define the handler as a class field arrow:</p>
+      <pre><code><span class="cm">// Class field arrow — 'this' is auto-bound, safe to pass directly</span>
+save = () => {
+  <span class="cm">// 'this' is always the component instance</span>
+}
+html<span class="str">`&lt;button @click=${this.save}&gt;Save&lt;/button&gt;`</span></code></pre>
 
       <h3>Rendering nothing</h3>
       <pre><code><span class="kw">import</span> { nothing } <span class="kw">from</span> <span class="str">'coup'</span>
