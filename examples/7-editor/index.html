@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>coup — block editor</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "lit-html": "https://esm.sh/lit-html@3",
+      "lit-html/": "https://esm.sh/lit-html@3/",
+      "coup": "../../index.js",
+      "@tiptap/core": "https://esm.sh/@tiptap/core@2",
+      "@tiptap/starter-kit": "https://esm.sh/@tiptap/starter-kit@2",
+      "@tiptap/extension-underline": "https://esm.sh/@tiptap/extension-underline@2",
+      "@tiptap/extension-image": "https://esm.sh/@tiptap/extension-image@2",
+      "@tiptap/extension-placeholder": "https://esm.sh/@tiptap/extension-placeholder@2"
+    }
+  }
+  </script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f8f9fa;
+      color: #1a1a1a;
+      padding: 1.5rem;
+    }
+
+    /* --- Header --- */
+    .app-header {
+      display: flex; align-items: baseline; gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .app-header h1 { font-size: 1.25rem; }
+    .app-header small { color: #888; font-size: 0.8rem; }
+
+    /* --- Toolbar --- */
+    editor-toolbar {
+      display: block;
+      border: 1px solid #ddd;
+      border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      background: #fff;
+      padding: 0.4rem 0.5rem;
+    }
+    .toolbar-row {
+      display: flex; flex-wrap: wrap; gap: 0.2rem; align-items: center;
+    }
+    .toolbar-row .sep {
+      width: 1px; height: 1.4rem; background: #ddd; margin: 0 0.25rem;
+    }
+    .toolbar-row button {
+      padding: 0.3rem 0.5rem; font-size: 0.82rem;
+      border: 1px solid transparent; border-radius: 4px;
+      background: transparent; cursor: pointer; color: #333;
+      line-height: 1; min-width: 1.8rem; text-align: center;
+    }
+    .toolbar-row button:hover { background: #f0f0f0; }
+    .toolbar-row button.active { background: #111; color: #fff; }
+
+    /* --- Split pane --- */
+    .editor-split {
+      display: flex; border: 1px solid #ddd; border-radius: 0 0 8px 8px;
+      background: #fff; min-height: 400px;
+    }
+    .editor-split .wysiwyg-pane {
+      flex: 1; min-width: 0;
+    }
+    .editor-split .code-pane {
+      flex: 1; min-width: 0;
+      border-left: 1px solid #ddd;
+    }
+    .editor-split .code-pane.hidden { display: none; }
+    .editor-split .wysiwyg-pane.full { flex: 1; }
+
+    /* --- Tiptap --- */
+    .tiptap {
+      padding: 1rem 1.25rem; outline: none;
+      min-height: 350px; font-size: 0.95rem; line-height: 1.6;
+    }
+    .tiptap > * + * { margin-top: 0.5em; }
+    .tiptap h1 { font-size: 1.8rem; margin-top: 1rem; }
+    .tiptap h2 { font-size: 1.4rem; margin-top: 0.8rem; }
+    .tiptap h3 { font-size: 1.15rem; margin-top: 0.6rem; }
+    .tiptap ul, .tiptap ol { padding-left: 1.5rem; }
+    .tiptap blockquote {
+      border-left: 3px solid #ddd; padding-left: 1rem;
+      color: #666; font-style: italic;
+    }
+    .tiptap pre {
+      background: #1e1e1e; color: #d4d4d4;
+      padding: 0.75rem 1rem; border-radius: 6px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.85rem; overflow-x: auto;
+    }
+    .tiptap code {
+      background: #f0f0f0; padding: 0.15rem 0.35rem;
+      border-radius: 3px; font-size: 0.85em;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+    .tiptap pre code { background: transparent; padding: 0; }
+    .tiptap hr { border: none; border-top: 2px solid #eee; margin: 1rem 0; }
+    .tiptap img {
+      max-width: 100%; height: auto; border-radius: 4px;
+      display: block; margin: 0.5rem 0;
+    }
+    .tiptap p.is-editor-empty:first-child::before {
+      content: attr(data-placeholder);
+      float: left; color: #aaa; pointer-events: none; height: 0;
+    }
+
+    /* Drag handle */
+    .tiptap [data-node-view-wrapper] {
+      position: relative;
+    }
+
+    /* --- CodeMirror pane --- */
+    .code-pane-header {
+      padding: 0.4rem 0.75rem; font-size: 0.75rem; color: #888;
+      border-bottom: 1px solid #eee; background: #fafafa;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+    .code-pane .cm-editor {
+      height: 100%; font-size: 0.82rem;
+    }
+    .code-pane .cm-editor .cm-scroller { overflow: auto; }
+    .code-pane .cm-editor.cm-focused { outline: none; }
+
+    /* --- Mode toggle --- */
+    .mode-toggle {
+      margin-left: auto; display: flex; gap: 0.2rem;
+    }
+    .mode-toggle button {
+      padding: 0.25rem 0.6rem; font-size: 0.75rem;
+      border: 1px solid #ddd; border-radius: 4px;
+      background: #fff; cursor: pointer; color: #666;
+    }
+    .mode-toggle button.active {
+      background: #111; color: #fff; border-color: #111;
+    }
+  </style>
+</head>
+<body>
+  <block-editor></block-editor>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
