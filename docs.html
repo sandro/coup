@@ -1392,18 +1392,37 @@ updated() {
 
       <h3>Live validation</h3>
       <p>For instant feedback as the user types, listen to <code>@input</code> and update state. Only use this when the user expects live results — search, filtering, character counts.</p>
-      <pre><code>template() {
-  <span class="kw">const</span> remaining = <span class="num">280</span> - (<span class="kw">this</span>.state.text?.length || <span class="num">0</span>)
-  <span class="kw">return</span> html<span class="str">`
-    &lt;textarea @input=${(e) => {
-      this.state.text = e.target.value
-      this.render()
-    }}&gt;&lt;/textarea&gt;
-    &lt;p style="color: ${remaining < 0 ? 'red' : '#666'}"&gt;
-      ${remaining} characters remaining
-    &lt;/p&gt;
-  `</span>
-}</code></pre>
+
+      <doc-example label="Live validation — character counter">
+        <script type="text/plain">
+import { CoupElement, html } from 'coup'
+
+class CharCounter extends CoupElement {
+  static tag = 'char-counter'
+  state = { text: '' }
+
+  template() {
+    const remaining = 280 - this.state.text.length
+    return html`
+      <textarea
+        rows="3"
+        style="width:100%; padding:0.5rem; font-family:inherit; font-size:0.9rem; border:1px solid #ccc; border-radius:4px; resize:vertical;"
+        placeholder="Type something..."
+        @input=${(e) => {
+          this.state.text = e.target.value
+          this.render()
+        }}></textarea>
+      <p style="color: ${remaining < 0 ? 'red' : '#666'}; font-size:0.85rem; margin:0.25rem 0 0;">
+        ${remaining} characters remaining
+      </p>
+    `
+  }
+}
+CharCounter.define()
+
+document.body.appendChild(document.createElement('char-counter'))
+        </script>
+      </doc-example>
 
       <!-- ================================================================ -->
       <h2 id="p-third-party">Pattern: Third-Party DOM</h2>
