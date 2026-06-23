@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>coup docs — the ~250-line web component library</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "lit-html": "https://esm.sh/lit-html@3",
+      "lit-html/": "https://esm.sh/lit-html@3/",
+      "coup": "./index.js"
+    }
+  }
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, system-ui, 'Segoe UI', sans-serif;
+      background: #0a0a0a; color: #c9d1d9;
+      line-height: 1.7;
+    }
+
+    /* Layout */
+    .layout { display: flex; min-height: 100vh; }
+
+    /* Sidebar nav */
+    nav {
+      position: fixed; top: 0; left: 0;
+      width: 220px; height: 100vh;
+      padding: 1.5rem 1rem;
+      border-right: 1px solid #21262d;
+      background: #0d1117;
+      overflow-y: auto;
+      z-index: 10;
+    }
+    nav a {
+      display: block; padding: 0.3rem 0.6rem; margin: 0.1rem 0;
+      color: #8b949e; text-decoration: none; font-size: 0.82rem;
+      border-radius: 4px; transition: color 0.15s, background 0.15s;
+    }
+    nav a:hover { color: #c9d1d9; background: #161b22; }
+    nav a.active { color: #58a6ff; background: #161b22; }
+    nav .logo {
+      font-size: 1.4rem; font-weight: 700; color: #fff;
+      margin-bottom: 1rem; padding-left: 0.6rem;
+      text-decoration: none; display: block;
+    }
+    nav .section-label {
+      font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;
+      color: #484f58; margin: 1rem 0 0.3rem 0.6rem;
+    }
+
+    /* Main content */
+    main { margin-left: 220px; max-width: 780px; padding: 2.5rem 3rem 4rem; }
+
+    h1 { font-size: 2.2rem; color: #fff; margin-bottom: 0.5rem; }
+    h2 {
+      font-size: 1.4rem; color: #fff; margin: 2.5rem 0 0.8rem;
+      padding-top: 1rem; border-top: 1px solid #21262d;
+    }
+    h2:first-of-type { border-top: none; padding-top: 0; }
+    h3 { font-size: 1.05rem; color: #e6edf3; margin: 1.5rem 0 0.5rem; }
+
+    p { margin-bottom: 0.8rem; color: #adbac7; }
+    strong { color: #e6edf3; }
+    code {
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      background: #161b22; padding: 0.15em 0.4em; border-radius: 3px;
+      font-size: 0.88em; color: #e6edf3;
+    }
+    pre {
+      background: #161b22; border: 1px solid #21262d; border-radius: 6px;
+      padding: 1rem 1.2rem; overflow-x: auto; margin: 0.5rem 0 1rem;
+      font-size: 0.82rem; line-height: 1.65;
+    }
+    pre code { background: none; padding: 0; border-radius: 0; }
+
+    /* Syntax highlighting */
+    .kw { color: #ff7b72; } .fn { color: #d2a8ff; } .str { color: #a5d6ff; }
+    .cm { color: #8b949e; } .num { color: #79c0ff; } .tag { color: #7ee787; }
+    .attr { color: #79c0ff; }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; margin: 0.5rem 0 1rem; font-size: 0.85rem; }
+    th { text-align: left; color: #8b949e; padding: 0.4rem 0.8rem; border-bottom: 1px solid #21262d; }
+    td { padding: 0.4rem 0.8rem; border-bottom: 1px solid #161b22; color: #adbac7; }
+    td code { font-size: 0.85em; }
+
+    /* Live example component */
+    doc-example { display: block; margin: 1rem 0 1.5rem; border: 1px solid #21262d; border-radius: 6px; overflow: hidden; }
+    doc-example script[type="text/plain"] { display: none; }
+    .example-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.4rem 0.75rem; background: #161b22; border-bottom: 1px solid #21262d;
+      font-size: 0.75rem; color: #8b949e;
+    }
+    .example-header button {
+      background: #238636; color: #fff; border: none;
+      padding: 0.25rem 0.75rem; border-radius: 4px;
+      font-size: 0.72rem; font-weight: 600; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .example-header button:hover { background: #2ea043; }
+    .example-source textarea {
+      width: 100%; min-height: 140px;
+      background: #0d1117; color: #c9d1d9;
+      border: none; padding: 0.8rem 1rem;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.8rem; line-height: 1.6;
+      resize: vertical; outline: none; tab-size: 2;
+    }
+    .example-preview {
+      border-top: 1px solid #21262d; background: #fff; color: #1a1a1a;
+      min-height: 50px;
+    }
+    .example-preview iframe { width: 100%; border: none; min-height: 60px; background: #fff; display: block; }
+
+    /* Lifecycle diagram */
+    .lifecycle {
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.78rem; line-height: 1.6;
+      background: #161b22; border: 1px solid #21262d; border-radius: 6px;
+      padding: 1rem 1.2rem; margin: 0.5rem 0 1rem; overflow-x: auto;
+    }
+
+    ul, ol { margin: 0.3rem 0 0.8rem 1.5rem; color: #adbac7; }
+    li { margin-bottom: 0.25rem; }
+
+    @media (max-width: 768px) {
+      nav { display: none; }
+      main { margin-left: 0; padding: 1.5rem 1.2rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <nav id="sidebar">
+      <a href="./" class="logo">coup</a>
+      <div class="section-label">Getting Started</div>
+      <a href="#quick-start">Quick Start</a>
+      <a href="#exports">Exports</a>
+      <div class="section-label">Components</div>
+      <a href="#defining">Defining Components</a>
+      <a href="#template">template()</a>
+      <a href="#render">render()</a>
+      <a href="#props">Props</a>
+      <a href="#attrs">Attributes</a>
+      <a href="#events">Events</a>
+      <a href="#emit">emit()</a>
+      <div class="section-label">State</div>
+      <a href="#store">Store</a>
+      <a href="#subscribe">static subscribe</a>
+      <a href="#store-changed">storeChanged()</a>
+      <div class="section-label">Lifecycle</div>
+      <a href="#lifecycle">Overview</a>
+      <a href="#connected">connected()</a>
+      <a href="#disconnected">disconnected()</a>
+      <a href="#props-changed">propsChanged()</a>
+      <a href="#updated">updated()</a>
+      <div class="section-label">Routing</div>
+      <a href="#router">Router</a>
+      <div class="section-label">Extras</div>
+      <a href="#debug">Debug Mode</a>
+      <a href="#helpers">Helpers</a>
+    </nav>
+
+    <main>
+      <h1>coup docs</h1>
+      <p>~250 lines. One dependency. No build step. <a href="./" style="color:#58a6ff;">Read the manifesto →</a></p>
+
+      <!-- ================================================================ -->
+      <h2 id="quick-start">Quick Start</h2>
+      <p>Create an <code>index.html</code> and an <code>app.js</code>. That's your project.</p>
+
+      <pre><code><span class="cm">&lt;!-- index.html --&gt;</span>
+<span class="tag">&lt;script</span> <span class="attr">type</span>=<span class="str">"importmap"</span><span class="tag">&gt;</span>
+{
+  <span class="str">"imports"</span>: {
+    <span class="str">"lit-html"</span>: <span class="str">"https://esm.sh/lit-html@3"</span>,
+    <span class="str">"lit-html/"</span>: <span class="str">"https://esm.sh/lit-html@3/"</span>,
+    <span class="str">"coup"</span>: <span class="str">"./index.js"</span>
+  }
+}
+<span class="tag">&lt;/script&gt;</span>
+
+<span class="tag">&lt;my-counter&gt;&lt;/my-counter&gt;</span>
+<span class="tag">&lt;script</span> <span class="attr">type</span>=<span class="str">"module"</span> <span class="attr">src</span>=<span class="str">"app.js"</span><span class="tag">&gt;&lt;/script&gt;</span></code></pre>
+
+      <doc-example label="Counter — your first coup component">
+        <script type="text/plain">
+import { CoupElement, html } from 'coup'
+
+class MyCounter extends CoupElement {
+  static tag = 'my-counter'
+  state = { count: 0 }
+
+  increment() {
+    this.state.count++
+    this.render()
+  }
+
+  template() {
+    return html`
+      <button @click=${() => this.increment()}
+              style="padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer;">
+        Clicked ${this.state.count} times
+      </button>
+    `
+  }
+}
+MyCounter.define()
+
+document.body.appendChild(document.createElement('my-counter'))
+        </script>
+      </doc-example>
+
+      <!-- ================================================================ -->
+      <h2 id="exports">Exports</h2>
+
+      <pre><code><span class="kw">import</span> { CoupElement, Store, html, svg, nothing, repeat } <span class="kw">from</span> <span class="str">'coup'</span></code></pre>
+
+      <table>
+        <thead><tr><th>Export</th><th>Source</th><th>What</th></tr></thead>
+        <tbody>
+          <tr><td><code>CoupElement</code></td><td>coup</td><td>Base class for components</td></tr>
+          <tr><td><code>Store</code></td><td>coup</td><td>Observable state container</td></tr>
+          <tr><td><code>html</code>, <code>svg</code></td><td>lit-html</td><td>Tagged template functions for DOM</td></tr>
+          <tr><td><code>nothing</code></td><td>lit-html</td><td>Render-nothing sentinel</td></tr>
+          <tr><td><code>repeat</code></td><td>lit-html</td><td>Keyed list rendering</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ================================================================ -->
+      <h2 id="defining">Defining Components</h2>
+      <p>Every component extends <code>CoupElement</code> and registers itself with a hyphenated tag name.</p>
+
+      <pre><code><span class="kw">class</span> <span class="fn">UserCard</span> <span class="kw">extends</span> CoupElement {
+  <span class="kw">static</span> tag = <span class="str">'user-card'</span>
+  template() { <span class="kw">return</span> html<span class="str">`&lt;p&gt;Hello!&lt;/p&gt;`</span> }
+}
+UserCard.<span class="fn">define</span>()</code></pre>
+
+      <p><code>define()</code> calls <code>customElements.define(tag, this)</code>. The tag must contain a hyphen (web component spec).</p>
+
+      <!-- ================================================================ -->
+      <h2 id="template">template()</h2>
+      <p>Return your component's markup using lit-html's <code>html</code> tagged template. Called internally on each render.</p>
+
+      <pre><code>template() {
+  <span class="kw">return</span> html<span class="str">`
+    &lt;h2&gt;${this.state.title}&lt;/h2&gt;
+    &lt;p&gt;${this.state.body}&lt;/p&gt;
+  `</span>
+}</code></pre>
+
+      <p>Use <code>${expression}</code> for dynamic values. lit-html only updates the parts that changed — no virtual DOM diffing.</p>
+
+      <!-- ================================================================ -->
+      <h2 id="render">render()</h2>
+      <p>Call <code>this.render()</code> to push your template to the DOM. This is the core of coup — <strong>you decide when to render</strong>.</p>
+
+      <doc-example label="Toggle — explicit render on state change">
+        <script type="text/plain">
+import { CoupElement, html } from 'coup'
+
+class ToggleBox extends CoupElement {
+  static tag = 'toggle-box'
+  state = { open: false }
+
+  toggle() {
+    this.state.open = !this.state.open
+    this.render()
+  }
+
+  template() {
+    return html`
+      <div>
+        <button @click=${() => this.toggle()}
+                style="padding: 0.4rem 0.8rem; cursor: pointer;">
+          ${this.state.open ? '▼ Hide' : '▶ Show'} details
+        </button>
+        ${this.state.open ? html`
+          <p style="margin-top: 0.5rem; padding: 0.5rem; background: #f0f0f0; border-radius: 4px;">
+            You called this.render(). That's why you can see this.
+          </p>
+        ` : ''}
+      </div>
+    `
+  }
+}
+ToggleBox.define()
+
+document.body.appendChild(document.createElement('toggle-box'))
+        </script>
+      </doc-example>
+
+      <!-- ================================================================ -->
+      <h2 id="props">Props</h2>
+      <p><code>static props</code> declares reactive properties. When a parent sets a prop, the component auto-re-renders.</p>
+
+      <pre><code><span class="kw">class</span> <span class="fn">UserCard</span> <span class="kw">extends</span> CoupElement {
+  <span class="kw">static</span> tag = <span class="str">'user-card'</span>
+  <span class="kw">static</span> props = { name: String, role: String }
+
+  template() {
+    <span class="kw">return</span> html<span class="str">`&lt;div&gt;&lt;strong&gt;${this.name}&lt;/strong&gt; — ${this.role}&lt;/div&gt;`</span>
+  }
+}
+
+<span class="cm">// Parent passes props via lit-html property binding:</span>
+html<span class="str">`&lt;user-card .name=${'Ada'} .role=${'Engineer'}&gt;&lt;/user-card&gt;`</span></code></pre>
+
+      <p>Multiple prop changes in the same microtask coalesce into a single render. Props use strict equality (<code>===</code>) — same value means no re-render.</p>
+
+      <p>Array-style declaration also works: <code>static props = ['name', 'role']</code></p>
+
+      <doc-example label="Props — parent passes data, child auto-renders">
+        <script type="text/plain">
+import { CoupElement, html } from 'coup'
+
+class ColorCard extends CoupElement {
+  static tag = 'color-card'
+  static props = { color: String, label: String }
+
+  template() {
+    return html`
+      <div style="display:inline-block; padding:0.5rem 1rem; margin:0.25rem;
+                  background:${this.color || '#eee'}; border-radius:4px;
+                  color:${this.color === '#333' ? '#fff' : '#333'};">
+        ${this.label || 'no label'}
+      </div>
+    `
+  }
+}
+ColorCard.define()
+
+class ColorPicker extends CoupElement {
+  static tag = 'color-picker'
+  state = {
+    colors: [
+      { color: '#ff6b6b', label: 'Red' },
+      { color: '#51cf66', label: 'Green' },
+      { color: '#339af0', label: 'Blue' },
+      { color: '#333', label: 'Dark' },
+    ]
+  }
+
+  template() {
+    return html`
+      <div>${this.state.colors.map(c =>
+        html`<color-card .color=${c.color} .label=${c.label}></color-card>`
+      )}</div>
+    `
+  }
+}
+ColorPicker.define()
+
+document.body.appendChild(document.createElement('color-picker'))
+        </script>
+      </doc-example>
+
+      <!-- ================================================================ -->
+      <h2 id="attrs">Attributes</h2>
+      <p><code>static attrs</code> maps HTML attributes to reactive values via <code>attributeChangedCallback</code>.</p>
+
+      <pre><code><span class="kw">class</span> <span class="fn">StatusBadge</span> <span class="kw">extends</span> CoupElement {
+  <span class="kw">static</span> tag = <span class="str">'status-badge'</span>
+  <span class="kw">static</span> attrs = { status: String }
+  <span class="kw">static</span> props = { status: String }
+
+  template() {
+    <span class="kw">const</span> colors = { online: <span class="str">'#51cf66'</span>, offline: <span class="str">'#aaa'</span>, busy: <span class="str">'#ff6b6b'</span> }
+    <span class="kw">return</span> html<span class="str">`&lt;span style="color: ${colors[this.status]}"&gt;● ${this.status}&lt;/span&gt;`</span>
+  }
+}</code></pre>
+
+      <p>When both <code>static attrs</code> and <code>static props</code> declare the same name, attribute changes set the prop (triggering auto-re-render).</p>
+
+      <table>
+        <thead><tr><th>Type</th><th>Coercion</th></tr></thead>
+        <tbody>
+          <tr><td><code>String</code></td><td>Value as-is. <code>null</code> → <code>undefined</code></td></tr>
+          <tr><td><code>Number</code></td><td><code>Number(value)</code>. <code>null</code> → <code>undefined</code></td></tr>
+          <tr><td><code>Boolean</code></td><td><code>true</code> if attribute present, <code>false</code> if removed</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ================================================================ -->
+      <h2 id="events">Events</h2>
+      <p><code>static events</code> auto-binds window-level event listeners. They're cleaned up when the component disconnects.</p>
+
+      <doc-example label="Events — listen to window events, auto-cleanup on disconnect">
+        <script type="text/plain">
+import { CoupElement, html } from 'coup'
+
+class KeyLogger extends CoupElement {
+  static tag = 'key-logger'
+  static events = { 'keydown': 'onKey' }
+  state = { keys: [] }
+
+  onKey(e) {
+    this.state.keys = [...this.state.keys.slice(-9), e.key]
+    this.render()
+  }
+
+  template() {
+    return html`
+      <div>
+        <p style="font-size:0.85rem; color:#666;">Click here, then press any key:</p>
+        <div style="display:flex; gap:0.3rem; flex-wrap:wrap; margin-top:0.3rem; min-height:2rem;">
+          ${this.state.keys.map(k => html`
+            <kbd style="padding:0.2rem 0.5rem; background:#f4f4f4; border:1px solid #ddd;
+                        border-radius:3px; font-family:monospace; font-size:0.85rem;">${k}</kbd>
+          `)}
+        </div>
+      </div>
+    `
+  }
+}
+KeyLogger.define()
+
+document.body.appendChild(document.createElement('key-logger'))
+        </script>
+      </doc-example>
+
+      <!-- ================================================================ -->
+      <h2 id="emit">emit()</h2>
+      <p>Dispatch a <code>CustomEvent</code> on <code>window</code>. Other components listen via <code>static events</code>.</p>
+
+      <pre><code><span class="cm">// Child emits:</span>
+this.<span class="fn">emit</span>(<span class="str">'item:selected'</span>, { id: <span class="num">42</span> })
+
+<span class="cm">// Parent listens:</span>
+<span class="kw">static</span> events = { <span class="str">'item:selected'</span>: <span class="str">'onItemSelected'</span> }
+
+<span class="fn">onItemSelected</span>(e) {
+  console.log(e.detail.id) <span class="cm">// 42</span>
+}</code></pre>
+
+      <p>Events flow through <code>window</code>, so any component anywhere can listen. Pub/sub with zero setup.</p>
+
+      <doc-example label="emit() — child sends events, parent listens">
+        <script type="text/plain">
+import { CoupElement, html } from 'coup'
+
+class ColorButton extends CoupElement {
+  static tag = 'color-button'
+  static props = { color: String }
+
+  template() {
+    return html`
+      <button @click=${() => this.emit('color:picked', this.color)}
+              style="background:${this.color}; color:#fff; border:none;
+                     padding:0.4rem 0.8rem; border-radius:4px; cursor:pointer;
+                     margin:0.2rem; font-size:0.85rem;">
+        ${this.color}
+      </button>
+    `
+  }
+}
+ColorButton.define()
+
+class ColorDisplay extends CoupElement {
+  static tag = 'color-display'
+  static events = { 'color:picked': 'onPick' }
+  state = { picked: 'none' }
+
+  onPick(e) {
+    this.state.picked = e.detail
+    this.render()
+  }
+
+  template() {
+    return html`
+      <div style="margin-bottom:0.5rem;">
+        <color-button .color=${'#ff6b6b'}></color-button>
+        <color-button .color=${'#51cf66'}></color-button>
+        <color-button .color=${'#339af0'}></color-button>
+      </div>
+      <p style="font-size:0.9rem;">
+        Picked: <strong style="color:${this.state.picked}">${this.state.picked}</strong>
+      </p>
+    `
+  }
+}
+ColorDisplay.define()
+
+document.body.appendChild(document.createElement('color-display'))
+        </script>
+      </doc-example>
+
+      <!-- ================================================================ -->
+      <h2 id="store">Store</h2>
+      <p>A lightweight observable state container. ~15 lines. Use it when components need shared state.</p>
+
+      <doc-example label="Store — shared state across components">
+        <script type="text/plain">
+import { CoupElement, Store, html } from 'coup'
+
+const counterStore = new Store({ count: 0 })
+
+class StoreButtons extends CoupElement {
+  static tag = 'store-buttons'
+  static subscribe = [counterStore]
+
+  template() {
+    return html`
+      <div style="display:flex; gap:0.5rem; align-items:center;">
+        <button @click=${() => counterStore.set(s => ({ count: s.count - 1 }))}
+                style="padding:0.3rem 0.7rem; cursor:pointer;">−</button>
+        <strong style="font-size:1.2rem; min-width:2rem; text-align:center;">
+          ${counterStore.state.count}
+        </strong>
+        <button @click=${() => counterStore.set(s => ({ count: s.count + 1 }))}
+                style="padding:0.3rem 0.7rem; cursor:pointer;">+</button>
+      </div>
+    `
+  }
+}
+StoreButtons.define()
+
+class StoreDisplay extends CoupElement {
+  static tag = 'store-display'
+  static subscribe = [counterStore]
+
+  template() {
+    const c = counterStore.state.count
+    const bar = '█'.repeat(Math.abs(c))
+    const color = c >= 0 ? '#51cf66' : '#ff6b6b'
+    return html`
+      <div style="margin-top:0.5rem; font-family:monospace;">
+        <span style="color:${color};">${c >= 0 ? '+' : ''}${c} ${bar}</span>
+      </div>
+    `
+  }
+}
+StoreDisplay.define()
+
+const div = document.createElement('div')
+div.innerHTML = '<store-buttons></store-buttons><store-display></store-display>'
+document.body.appendChild(div)
+        </script>
+      </doc-example>
+
+      <h3>Store API</h3>
+      <pre><code><span class="kw">const</span> store = <span class="kw">new</span> <span class="fn">Store</span>({ count: <span class="num">0</span>, items: [] })
+
+<span class="cm">// Read</span>
+store.state.count  <span class="cm">// 0</span>
+
+<span class="cm">// Update (object — shallow merge)</span>
+store.<span class="fn">set</span>({ count: <span class="num">1</span> })
+
+<span class="cm">// Update (function — derive from current state)</span>
+store.<span class="fn">set</span>(s => ({ count: s.count + <span class="num">1</span> }))
+
+<span class="cm">// Subscribe (returns unsubscribe function)</span>
+<span class="kw">const</span> unsub = store.<span class="fn">subscribe</span>(() => console.log(<span class="str">'changed'</span>))
+unsub()</code></pre>
+
+      <!-- ================================================================ -->
+      <h2 id="subscribe">static subscribe</h2>
+      <p>Auto-wire store subscriptions. The component re-renders when any subscribed store changes.</p>
+
+      <pre><code><span class="kw">class</span> <span class="fn">Dashboard</span> <span class="kw">extends</span> CoupElement {
+  <span class="kw">static</span> tag = <span class="str">'app-dashboard'</span>
+  <span class="kw">static</span> subscribe = [userStore, settingsStore]
+
+  template() {
+    <span class="kw">return</span> html<span class="str">`&lt;p&gt;${userStore.state.name} — ${settingsStore.state.theme}&lt;/p&gt;`</span>
+  }
+}</code></pre>
+
+      <p>Subscriptions are cleaned up automatically on disconnect. Works with any object that has a <code>subscribe(fn) → unsubscribe</code> contract.</p>
+
+      <!-- ================================================================ -->
+      <h2 id="store-changed">storeChanged()</h2>
+      <p>Define <code>storeChanged</code> and <strong>you own the render</strong>. Coup won't auto-render — call <code>this.render()</code> when you're ready. Async storeChanged just works.</p>
+
+      <pre><code><span class="kw">async</span> <span class="fn">storeChanged</span>(store, newState) {
+  <span class="cm">// Do async work — fetch, IndexedDB, whatever</span>
+  <span class="kw">const</span> data = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">`/api/${newState.id}`</span>)
+  this.state.detail = <span class="kw">await</span> data.<span class="fn">json</span>()
+  this.<span class="fn">render</span>()  <span class="cm">// render when ready, not before</span>
+}</code></pre>
+
+      <p>The contract:</p>
+      <ul>
+        <li>No <code>storeChanged</code> → auto-render on store change</li>
+        <li><code>storeChanged</code> defined → you call <code>this.render()</code> when ready</li>
+      </ul>
+
+      <!-- ================================================================ -->
+      <h2 id="lifecycle">Lifecycle</h2>
+      <p>Five hooks. That's it.</p>
+
+      <div class="lifecycle">
+        constructor<br>
+        &nbsp;&nbsp;↓<br>
+        connectedCallback &nbsp;← browser inserts element into DOM<br>
+        &nbsp;&nbsp;↓<br>
+        <strong>connected()</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;← set up listeners, fetch data<br>
+        &nbsp;&nbsp;↓<br>
+        <strong>propsChanged()</strong> &nbsp;&nbsp;&nbsp;← initial props from parent (batched)<br>
+        &nbsp;&nbsp;↓<br>
+        first render → template() → lit-html → DOM<br>
+        &nbsp;&nbsp;↓<br>
+        <strong>updated()</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;← DOM is ready, measure / scroll / init widgets<br>
+        &nbsp;&nbsp;↓<br>
+        prop changes → <strong>propsChanged()</strong> → auto re-render<br>
+        store changes → <strong>storeChanged()</strong> or auto re-render<br>
+        &nbsp;&nbsp;↓<br>
+        disconnectedCallback ← browser removes element<br>
+        &nbsp;&nbsp;↓<br>
+        <strong>disconnected()</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;← clean up timers, listeners
+      </div>
+
+      <!-- ================================================================ -->
+      <h2 id="connected">connected()</h2>
+      <p>Called when the element enters the DOM. Fetch data, start timers, set up.</p>
+
+      <doc-example label="connected() — fetch data on mount">
+        <script type="text/plain">
+import { CoupElement, html } from 'coup'
+
+class GithubUser extends CoupElement {
+  static tag = 'github-user'
+  state = { user: null, loading: true }
+
+  async connected() {
+    const res = await fetch('https://api.github.com/users/sandro')
+    this.state.user = await res.json()
+    this.state.loading = false
+    this.render()
+  }
+
+  template() {
+    if (this.state.loading) return html`<p>Loading...</p>`
+    const u = this.state.user
+    return html`
+      <div style="display:flex; align-items:center; gap:0.75rem;">
+        <img src=${u.avatar_url} width="48" height="48" style="border-radius:50%;">
+        <div>
+          <strong>${u.name}</strong>
+          <div style="font-size:0.85rem; color:#666;">${u.public_repos} repos · ${u.followers} followers</div>
+        </div>
+      </div>
+    `
+  }
+}
+GithubUser.define()
+
+document.body.appendChild(document.createElement('github-user'))
+        </script>
+      </doc-example>
+
+      <!-- ================================================================ -->
+      <h2 id="disconnected">disconnected()</h2>
+      <p>Called when the element leaves the DOM. Clean up timers, listeners, connections.</p>
+
+      <pre><code><span class="fn">connected</span>() {
+  this._interval = setInterval(() => {
+    this.state.elapsed++
+    this.<span class="fn">render</span>()
+  }, <span class="num">1000</span>)
+}
+
+<span class="fn">disconnected</span>() {
+  clearInterval(this._interval)  <span class="cm">// no leaks</span>
+}</code></pre>
+
+      <!-- ================================================================ -->
+      <h2 id="props-changed">propsChanged()</h2>
+      <p>Fires when parent-set props change. Receives a batch of all changes in the current microtask.</p>
+
+      <pre><code><span class="fn">propsChanged</span>(changes) {
+  <span class="cm">// changes = { propName: { old: prevValue, new: newValue }, ... }</span>
+  <span class="kw">if</span> (<span class="str">'projectId'</span> <span class="kw">in</span> changes) {
+    this.<span class="fn">loadProject</span>(changes.projectId.new)
+  }
+}</code></pre>
+
+      <p>No need to call <code>this.render()</code> — prop changes already trigger auto-render. Use <code>propsChanged</code> for side effects like data fetching.</p>
+
+      <!-- ================================================================ -->
+      <h2 id="updated">updated()</h2>
+      <p>Fires after a successful render. DOM measurements, scroll positioning, third-party widget init.</p>
+
+      <pre><code><span class="fn">updated</span>() {
+  <span class="cm">// DOM is up to date — safe to measure or init widgets</span>
+  <span class="kw">const</span> el = this.<span class="fn">$</span>(<span class="str">'.scroll-container'</span>)
+  <span class="kw">if</span> (el) el.scrollTop = el.scrollHeight
+}</code></pre>
+
+      <p>Only fires after a <strong>successful</strong> render. If <code>template()</code> throws, <code>updated()</code> is skipped.</p>
+
+      <!-- ================================================================ -->
+      <h2 id="router">Router</h2>
+      <p>Hash-based SPA router. No server config. Works on GitHub Pages.</p>
+
+      <doc-example label="Router — hash-based navigation">
+        <script type="text/plain">
+import { CoupElement, html } from 'coup'
+
+class MiniApp extends CoupElement {
+  static tag = 'mini-app'
+  state = { page: location.hash.slice(2) || 'home' }
+
+  connected() {
+    this._onHash = () => {
+      this.state.page = location.hash.slice(2) || 'home'
+      this.render()
+    }
+    window.addEventListener('hashchange', this._onHash)
+  }
+
+  disconnected() {
+    window.removeEventListener('hashchange', this._onHash)
+  }
+
+  template() {
+    const page = this.state.page
+    const pages = ['home', 'about', 'contact']
+    return html`
+      <nav style="display:flex; gap:1rem; margin-bottom:0.75rem;">
+        ${pages.map(p => html`
+          <a href="#/${p}"
+             style="color:${page === p ? '#339af0' : '#555'}; text-decoration:none;
+                    font-weight:${page === p ? '600' : '400'}; cursor:pointer;">
+            ${p}
+          </a>
+        `)}
+      </nav>
+      <div style="padding:0.75rem; background:#f8f9fa; border-radius:4px;">
+        ${page === 'home' ? html`<p>🏠 Welcome home.</p>` : ''}
+        ${page === 'about' ? html`<p>ℹ️ coup is ~250 lines. You're reading them.</p>` : ''}
+        ${page === 'contact' ? html`<p>📬 Open an issue on GitHub.</p>` : ''}
+      </div>
+    `
+  }
+}
+MiniApp.define()
+
+document.body.appendChild(document.createElement('mini-app'))
+        </script>
+      </doc-example>
+
+      <h3>Router API</h3>
+      <pre><code><span class="kw">import</span> { Router } <span class="kw">from</span> <span class="str">'./router.js'</span>
+
+<span class="kw">const</span> router = <span class="kw">new</span> <span class="fn">Router</span>([<span class="str">'/home'</span>, <span class="str">'/user/:id'</span>, <span class="str">'/files/*'</span>])
+
+router.<span class="fn">go</span>(<span class="str">'/user/42'</span>)       <span class="cm">// navigate (adds history entry)</span>
+router.<span class="fn">replace</span>(<span class="str">'/home'</span>)    <span class="cm">// navigate (no history entry)</span>
+router.pattern               <span class="cm">// '/user/:id'</span>
+router.params                <span class="cm">// { id: '42' }</span>
+router.path                  <span class="cm">// '/user/42'</span>
+router.<span class="fn">isActive</span>(<span class="str">'/user/:id'</span>) <span class="cm">// true</span>
+
+<span class="kw">const</span> unsub = router.<span class="fn">subscribe</span>(() => {
+  console.log(router.pattern, router.params)
+})
+router.<span class="fn">destroy</span>()  <span class="cm">// clean up listeners</span></code></pre>
+
+      <!-- ================================================================ -->
+      <h2 id="debug">Debug Mode</h2>
+      <p>One switch. Warns about common mistakes.</p>
+
+      <pre><code>CoupElement.debug = <span class="kw">true</span>
+
+<span class="cm">// Warns on:</span>
+<span class="cm">// - State mutation without this.render()</span>
+<span class="cm">// - Stale templates (render returns same reference)</span>
+<span class="cm">// - Prop reference issues (object identity vs equality)</span></code></pre>
+
+      <!-- ================================================================ -->
+      <h2 id="helpers">Helpers</h2>
+
+      <h3><code>$(selector)</code></h3>
+      <p>Shortcut for <code>this.querySelector(selector)</code>.</p>
+      <pre><code><span class="kw">const</span> input = this.<span class="fn">$</span>(<span class="str">'input.name'</span>)</code></pre>
+
+      <h3><code>$$(selector)</code></h3>
+      <p>Shortcut for <code>[...this.querySelectorAll(selector)]</code>. Returns a real <code>Array</code>.</p>
+      <pre><code>this.<span class="fn">$$</span>(<span class="str">'.item'</span>).<span class="fn">forEach</span>(el => el.classList.add(<span class="str">'active'</span>))</code></pre>
+
+      <h3><code>emit(name, detail)</code></h3>
+      <p>Dispatches a <code>CustomEvent</code> on <code>window</code>. See <a href="#emit" style="color:#58a6ff;">Events</a>.</p>
+
+      <h3><code>repeat(items, keyFn, template)</code></h3>
+      <p>Re-exported from lit-html. Renders keyed lists — essential for reordering and animations.</p>
+
+      <pre><code><span class="kw">import</span> { repeat } <span class="kw">from</span> <span class="str">'coup'</span>
+
+template() {
+  <span class="kw">return</span> html<span class="str">`
+    &lt;ul&gt;
+      ${repeat(this.state.items, i => i.id, i => html`
+        &lt;li&gt;${i.name}&lt;/li&gt;
+      `)}
+    &lt;/ul&gt;
+  `</span>
+}</code></pre>
+
+      <br>
+      <p style="color:#8b949e; text-align:center; margin-top:2rem; padding-top:1rem; border-top:1px solid #21262d;">
+        <a href="./" style="color:#58a6ff;">Home</a> ·
+        <a href="https://github.com/sandro/coup" style="color:#58a6ff;">Source</a> ·
+        ~250 lines · That's a coup.
+      </p>
+    </main>
+  </div>
+
+  <script type="module">
+    import { CoupElement, html } from 'coup'
+
+    // =========================================================================
+    // <doc-example> — live editable code example, powered by coup
+    //
+    // Reads source from a <script type="text/plain"> child.
+    // Runs it in a sandboxed iframe with coup available via importmap.
+    // Edit the code, hit Run (or Cmd+Enter), see it render.
+    // =========================================================================
+    class DocExample extends CoupElement {
+      static tag = 'doc-example'
+
+      state = { code: '', ran: false }
+
+      connected() {
+        // Read code from the <script type="text/plain"> child
+        const script = this.querySelector('script[type="text/plain"]')
+        if (script) {
+          // Trim leading/trailing blank lines, dedent
+          const lines = script.textContent.split('\n')
+          // Remove leading/trailing empty lines
+          while (lines.length && !lines[0].trim()) lines.shift()
+          while (lines.length && !lines[lines.length - 1].trim()) lines.pop()
+          // Find minimum indentation
+          const indent = Math.min(...lines.filter(l => l.trim()).map(l => l.match(/^(\s*)/)[1].length))
+          this.state.code = lines.map(l => l.slice(indent)).join('\n')
+        }
+        // Auto-run after first render
+        requestAnimationFrame(() => this.run())
+      }
+
+      run() {
+        const textarea = this.$('textarea')
+        const code = textarea ? textarea.value : this.state.code
+        const iframe = this.$('iframe')
+        if (!iframe) return
+
+        const doc = `<!DOCTYPE html>
+<html><head>
+<script type="importmap">
+{"imports":{"lit-html":"https://esm.sh/lit-html@3","lit-html/":"https://esm.sh/lit-html@3/","coup":"${new URL('index.js', location.href)}"}}
+<\/script>
+<style>body{font-family:-apple-system,system-ui,sans-serif;padding:0.5rem;margin:0}*{box-sizing:border-box}</style>
+</head><body>
+<script type="module">${code}<\/script>
+</body></html>`
+
+        iframe.srcdoc = doc
+        this.state.ran = true
+      }
+
+      template() {
+        const label = this.getAttribute('label') || 'Live Example'
+        return html`
+          <div class="example-header">
+            <span>${label}</span>
+            <button @click=${() => this.run()}>▶ Run</button>
+          </div>
+          <div class="example-source">
+            <textarea spellcheck="false"
+              .value=${this.state.code}
+              @keydown=${(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                  e.preventDefault()
+                  this.run()
+                }
+                if (e.key === 'Tab') {
+                  e.preventDefault()
+                  const t = e.target
+                  const start = t.selectionStart
+                  t.setRangeText('  ', start, t.selectionEnd, 'end')
+                }
+              }}></textarea>
+          </div>
+          <div class="example-preview">
+            <iframe sandbox="allow-scripts allow-same-origin"></iframe>
+          </div>
+        `
+      }
+    }
+    DocExample.define()
+
+    // Scroll-spy for sidebar nav
+    function updateActiveNav() {
+      const sections = document.querySelectorAll('h2[id]')
+      const links = document.querySelectorAll('#sidebar a[href^="#"]')
+      let current = ''
+      sections.forEach(s => {
+        if (s.getBoundingClientRect().top <= 100) current = s.id
+      })
+      links.forEach(link => {
+        link.classList.toggle('active', link.getAttribute('href') === '#' + current)
+      })
+    }
+    window.addEventListener('scroll', updateActiveNav, { passive: true })
+    updateActiveNav()
+  </script>
+</body>
+</html>
