@@ -4,7 +4,7 @@ A coup against the tyranny of the modern frontend.
 
 You don't need a build step. You don't need a virtual DOM. You don't need hooks, signals, effects, memos, reducers, selectors, or a PhD in reactivity theory to put HTML on a screen.
 
-You need a component. You need a template. You need to decide when to render. That's coup.
+You need a component. You need a template. You need to decide when to render. That's a coup.
 
 **~250 lines of code. One dependency ([lit-html](https://lit.dev/docs/libraries/standalone-templates/), ~3KB gzip). No build step. No CLI. No starter template.**
 
