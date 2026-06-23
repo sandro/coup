@@ -208,6 +208,12 @@
       <a href="#debug">Debug Mode</a>
       <a href="#helpers">Helpers</a>
       <a href="#web-components">For WC Developers</a>
+      <div class="section-label">Building Apps</div>
+      <a href="#lit-html-cheat">lit-html Cheatsheet</a>
+      <a href="#styling">Styling</a>
+      <a href="#project-structure">Project Structure</a>
+      <a href="#gotchas">Common Mistakes</a>
+      <a href="#deployment">Deployment</a>
       <div class="section-label">Patterns</div>
       <a href="#p-animations">Animations</a>
       <a href="#p-async">Async Data</a>
@@ -676,38 +682,72 @@ unsub()</code></pre>
       <h2 id="connected">connected()</h2>
       <p>Your component just appeared in the DOM. This is where you do setup work — fetch data from an API, start an interval timer, initialize a third-party library. It's the equivalent of React's <code>componentDidMount</code> or the "run once on mount" <code>useEffect</code>, except it's just a method with a clear name.</p>
 
-      <doc-example label="connected() — fetch data on mount">
+      <doc-example label="connected() + forms — fetch weather for any city">
         <script type="text/plain">
 import { CoupElement, html } from 'coup'
 
-class SFWeather extends CoupElement {
-  static tag = 'sf-weather'
-  state = { weather: null, loading: true }
+const ICONS = {0:'☀️',1:'🌤',2:'⛅',3:'☁️',45:'🌫',51:'🌦',61:'🌧',71:'❄️',95:'⛈'}
+
+class CityWeather extends CoupElement {
+  static tag = 'city-weather'
+  state = { city: 'San Francisco', weather: null, loading: true, error: null }
 
   async connected() {
-    const res = await fetch(
-      'https://api.open-meteo.com/v1/forecast?latitude=37.77&longitude=-122.42&current=temperature_2m,weathercode&temperature_unit=fahrenheit'
-    )
-    this.state.weather = await res.json()
-    this.state.loading = false
+    await this.fetchWeather(this.state.city)
+  }
+
+  async search(e) {
+    e.preventDefault()
+    const city = this.$('[name=city]').value.trim()
+    if (!city) return
+    this.state.city = city
+    await this.fetchWeather(city)
+  }
+
+  async fetchWeather(city) {
+    this.state.loading = true
+    this.state.error = null
+    this.render()
+    try {
+      const geo = await fetch(
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`
+      )
+      const { results } = await geo.json()
+      if (!results?.length) throw new Error('City not found')
+      const { latitude, longitude, name } = results[0]
+      const res = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weathercode&temperature_unit=fahrenheit`
+      )
+      this.state.weather = await res.json()
+      this.state.city = name
+      this.state.loading = false
+    } catch (err) {
+      this.state.error = err.message
+      this.state.loading = false
+    }
     this.render()
   }
 
   template() {
-    if (this.state.loading) return html`<p>Loading...</p>`
-    const c = this.state.weather.current
-    const icons = {0:'☀️',1:'🌤',2:'⛅',3:'☁️',45:'🌫',51:'🌦',61:'🌧',71:'❄️',95:'⛈'}
-    const icon = icons[c.weathercode] || '🌡️'
+    const { city, weather, loading, error } = this.state
     return html`
-      <div style="font-size:1.5rem;">
-        ${icon} San Francisco: ${c.temperature_2m}°F
-      </div>
+      <form @submit=${(e) => this.search(e)} style="display:flex; gap:0.5rem; margin-bottom:0.75rem;">
+        <input name="city" .value=${city} placeholder="Enter a city"
+               style="padding:0.3rem 0.5rem; border:1px solid #ccc; border-radius:4px; flex:1;">
+        <button type="submit" style="padding:0.3rem 0.75rem;">🔍</button>
+      </form>
+      ${loading ? html`<p>Loading...</p>`
+        : error ? html`<p style="color:red;">❌ ${error}</p>`
+        : html`<div style="font-size:1.4rem;">
+            ${ICONS[weather.current.weathercode] || '🌡️'}
+            ${city}: ${weather.current.temperature_2m}°F
+          </div>`}
     `
   }
 }
-SFWeather.define()
+CityWeather.define()
 
-document.body.appendChild(document.createElement('sf-weather'))
+document.body.appendChild(document.createElement('city-weather'))
         </script>
       </doc-example>
 
@@ -1032,40 +1072,86 @@ updated() {
 
       <!-- ================================================================ -->
       <h2 id="p-forms">Pattern: Forms</h2>
-      <p>Coup doesn't have two-way binding or controlled inputs. Instead, just read the DOM when you need the value. The simplest approach is usually the best — grab the input in the submit handler.</p>
+      <p>Coup doesn't have two-way binding or controlled inputs. You don't need them — the browser already has <code>FormData</code>, and it works beautifully. Grab the form on submit, turn it into an object, send it. No state syncing, no onChange handlers for every field.</p>
 
-      <pre><code><span class="kw">class</span> LoginForm <span class="kw">extends</span> CoupElement {
-  <span class="kw">static</span> tag = <span class="str">'login-form'</span>
+      <h3>FormData → JSON request</h3>
+      <p>This is the pattern you'll use most. The form holds its own state (that's what forms do), and you read it all at once on submit. Hidden fields work too — great for IDs, tokens, or metadata the user doesn't need to see.</p>
+      <pre><code><span class="kw">class</span> ContactForm <span class="kw">extends</span> CoupElement {
+  <span class="kw">static</span> tag = <span class="str">'contact-form'</span>
 
-  submit(e) {
+  state = { sending: <span class="kw">false</span>, sent: <span class="kw">false</span>, error: <span class="kw">null</span> }
+
+  <span class="kw">async</span> submit(e) {
     e.preventDefault()
-    <span class="kw">const</span> email = <span class="kw">this</span>.$(<span class="str">'[name=email]'</span>).value
-    <span class="kw">const</span> password = <span class="kw">this</span>.$(<span class="str">'[name=password]'</span>).value
-    <span class="cm">// do something with email & password</span>
+
+    <span class="cm">// FormData reads every named field — inputs, selects, textareas, hidden</span>
+    <span class="kw">const</span> data = Object.fromEntries(<span class="kw">new</span> FormData(e.target))
+    <span class="cm">// data = { formId: "contact-v2", name: "Ada", email: "ada@...", ... }</span>
+
+    <span class="kw">this</span>.state.sending = <span class="kw">true</span>
+    <span class="kw">this</span>.render()
+
+    <span class="kw">try</span> {
+      <span class="kw">const</span> res = <span class="kw">await</span> fetch(<span class="str">'/api/contact'</span>, {
+        method: <span class="str">'POST'</span>,
+        headers: { <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span> },
+        body: JSON.stringify(data),
+      })
+      <span class="kw">if</span> (!res.ok) <span class="kw">throw</span> <span class="kw">new</span> Error(<span class="str">`${res.status}`</span>)
+      <span class="kw">this</span>.state.sent = <span class="kw">true</span>
+    } <span class="kw">catch</span> (err) {
+      <span class="kw">this</span>.state.error = err.message
+    }
+    <span class="kw">this</span>.state.sending = <span class="kw">false</span>
+    <span class="kw">this</span>.render()
   }
 
   template() {
+    <span class="kw">if</span> (<span class="kw">this</span>.state.sent) <span class="kw">return</span> html<span class="str">`&lt;p&gt;✅ Sent!&lt;/p&gt;`</span>
     <span class="kw">return</span> html<span class="str">`
       &lt;form @submit=${(e) => this.submit(e)}&gt;
-        &lt;input name="email" type="email" placeholder="Email"&gt;
-        &lt;input name="password" type="password" placeholder="Password"&gt;
-        &lt;button type="submit"&gt;Log in&lt;/button&gt;
+        &lt;input type="hidden" name="formId" value="contact-v2"&gt;
+
+        &lt;label&gt;Name &lt;input name="name" required&gt;&lt;/label&gt;
+        &lt;label&gt;Email &lt;input name="email" type="email" required&gt;&lt;/label&gt;
+        &lt;label&gt;Subject
+          &lt;select name="subject"&gt;
+            &lt;option&gt;General&lt;/option&gt;
+            &lt;option&gt;Support&lt;/option&gt;
+            &lt;option&gt;Feedback&lt;/option&gt;
+          &lt;/select&gt;
+        &lt;/label&gt;
+        &lt;label&gt;Message &lt;textarea name="message" rows="3"&gt;&lt;/textarea&gt;&lt;/label&gt;
+
+        &lt;button type="submit" ?disabled=${this.state.sending}&gt;
+          ${this.state.sending ? 'Sending...' : 'Send'}
+        &lt;/button&gt;
+        ${this.state.error ? html`&lt;p style="color:red"&gt;${this.state.error}&lt;/p&gt;` : ''}
       &lt;/form&gt;
     `</span>
   }
 }</code></pre>
 
-      <p>For live validation or search-as-you-type, listen to <code>@input</code> and update state:</p>
+      <p>Key points:</p>
+      <ul>
+        <li><code>Object.fromEntries(new FormData(form))</code> gives you a plain object from all named fields — including the hidden <code>formId</code> field</li>
+        <li><code>?disabled=${bool}</code> is lit-html's boolean attribute syntax — it adds or removes the attribute</li>
+        <li>The form owns its own state (input values). Coup manages the <em>submission</em> state (sending, sent, error)</li>
+        <li>Two renders: one for loading state, one for result. Both intentional.</li>
+      </ul>
+
+      <h3>Live validation</h3>
+      <p>For instant feedback as the user types, listen to <code>@input</code> and update state. Only use this when the user expects live results — search, filtering, character counts.</p>
       <pre><code>template() {
+  <span class="kw">const</span> remaining = <span class="num">280</span> - (<span class="kw">this</span>.state.text?.length || <span class="num">0</span>)
   <span class="kw">return</span> html<span class="str">`
-    &lt;input @input=${(e) => {
-      this.state.query = e.target.value
-      this.state.results = this.search(e.target.value)
+    &lt;textarea @input=${(e) => {
+      this.state.text = e.target.value
       this.render()
-    }}&gt;
-    &lt;ul&gt;
-      ${this.state.results.map(r => html`&lt;li&gt;${r}&lt;/li&gt;`)}
-    &lt;/ul&gt;
+    }}&gt;&lt;/textarea&gt;
+    &lt;p style="color: ${remaining < 0 ? 'red' : '#666'}"&gt;
+      ${remaining} characters remaining
+    &lt;/p&gt;
   `</span>
 }</code></pre>
 
