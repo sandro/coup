@@ -195,6 +195,16 @@
       <div class="section-label">Extras</div>
       <a href="#debug">Debug Mode</a>
       <a href="#helpers">Helpers</a>
+      <a href="#web-components">For WC Developers</a>
+      <div class="section-label">Patterns</div>
+      <a href="#p-animations">Animations</a>
+      <a href="#p-async">Async Data</a>
+      <a href="#p-forms">Forms</a>
+      <a href="#p-third-party">Third-Party DOM</a>
+      <a href="#p-debounce">Debouncing</a>
+      <a href="#p-communication">Communication</a>
+      <a href="#p-keyed-lists">Keyed Lists</a>
+      <a href="#p-conditional">Conditional Rendering</a>
     </nav>
 
     <main>
@@ -802,6 +812,59 @@ router.<span class="fn">destroy</span>()  <span class="cm">// clean up listeners
 <span class="cm">// - Prop reference issues (object identity vs equality)</span></code></pre>
 
       <!-- ================================================================ -->
+      <h2 id="web-components">For Web Component Developers</h2>
+      <p>If you already know custom elements, coup will feel familiar — but some things are intentionally different. Here's what you need to unlearn, and what you get instead.</p>
+
+      <h3>What coup replaces</h3>
+      <table>
+        <tr><th>Raw custom element</th><th>Coup equivalent</th></tr>
+        <tr>
+          <td><code>connectedCallback()</code> + <code>super</code></td>
+          <td><code>connected()</code> — no super call needed, coup handles the plumbing</td>
+        </tr>
+        <tr>
+          <td><code>disconnectedCallback()</code> + <code>super</code></td>
+          <td><code>disconnected()</code> — same deal, just your cleanup code</td>
+        </tr>
+        <tr>
+          <td><code>attributeChangedCallback()</code> +<br><code>static get observedAttributes()</code></td>
+          <td><code>static attrs = { name: Type }</code> — coup generates both, coerces types (String/Number/Boolean), and auto-re-renders</td>
+        </tr>
+        <tr>
+          <td><code>this.attachShadow()</code></td>
+          <td>Not used. Coup renders to light DOM. Your CSS just works — regular selectors, no <code>::part()</code>, no <code>::slotted()</code></td>
+        </tr>
+        <tr>
+          <td><code>this.innerHTML = ...</code> or render library</td>
+          <td><code>template()</code> returns <code>html`...`</code>, coup calls lit-html's render</td>
+        </tr>
+        <tr>
+          <td><code>this.dispatchEvent(new CustomEvent(...))</code></td>
+          <td><code>this.emit(name, detail)</code> — fires on <code>window</code></td>
+        </tr>
+        <tr>
+          <td>Manual <code>addEventListener</code>/<code>removeEventListener</code></td>
+          <td><code>static events = { 'name': 'handler' }</code> — auto-bind on connect, auto-cleanup on disconnect</td>
+        </tr>
+      </table>
+
+      <h3>Things that might trip you up</h3>
+
+      <p><strong>No Shadow DOM.</strong> Coup renders into the element itself (light DOM). If you're used to style encapsulation via shadow root, that's not here — and it's intentional. Shadow DOM adds complexity (slotting, <code>::part()</code>, closed vs open mode) that most apps don't need. Style your coup components like any other HTML element.</p>
+
+      <p><strong>Props ≠ Attributes.</strong> In raw web components, attributes and properties are the same headache. In coup, they're separate systems with a clean bridge. <code>static props</code> handles JavaScript property passing — a parent sets <code>.name=${'Ada'}</code> via lit-html. <code>static attrs</code> handles HTML attribute strings like <code>&lt;my-el name="Ada"&gt;</code>. If you declare the same name in both, attribute changes automatically flow into the prop system.</p>
+
+      <p><strong>Never call <code>super.connectedCallback()</code>.</strong> Coup's <code>connected()</code> and <code>disconnected()</code> are clean hooks — coup calls them at the right time after its own setup. If you override <code>connectedCallback</code> directly (don't), you'd need the super call, but that's fighting the framework.</p>
+
+      <p><strong><code>this.render()</code> is synchronous.</strong> It calls lit-html's <code>render()</code> immediately. Prop changes and store changes batch via microtask, but when you explicitly call <code>this.render()</code>, the DOM updates right now. After an <code>await</code>, you know the DOM is updated on the next line. No <code>requestAnimationFrame</code> guessing.</p>
+
+      <p><strong><code>template()</code> returns a tagged template, not a string.</strong> Not <code>innerHTML</code>, not DOM nodes. lit-html's <code>html</code> tagged template looks like a string but it's a structured template that enables efficient diffing. If you're used to building DOM manually, let go — <code>html`...`</code> handles it.</p>
+
+      <p><strong>No <code>adoptedCallback</code>.</strong> Moving elements between documents is edge-case territory coup doesn't cover. If you need it, you probably need a different tool.</p>
+
+      <p><strong><code>define()</code> is idempotent.</strong> Call <code>MyEl.define()</code> multiple times and it only registers once. No need to guard with <code>customElements.get()</code> — coup already does.</p>
+
+      <!-- ================================================================ -->
       <h2 id="helpers">Helpers</h2>
 
       <h3><code>$(selector)</code></h3>
@@ -830,10 +893,339 @@ template() {
   `</span>
 }</code></pre>
 
+      <!-- ================================================================ -->
+      <!-- PATTERNS -->
+      <!-- ================================================================ -->
+
+      <h2 id="p-animations">Pattern: Animations</h2>
+      <p>Coup doesn't have an animation system — the browser already has a great one. The key insight: <code>updated()</code> fires after the DOM renders, so it's the perfect place to trigger enter animations. Exit animations need a bit more thought because you have to delay removal until the animation finishes.</p>
+
+      <h3>Enter animation</h3>
+      <p>Add a CSS class that triggers the animation. Since <code>updated()</code> fires after the DOM is ready, your new elements exist and the browser can animate them.</p>
+      <pre><code><span class="cm">// CSS:</span>
+<span class="cm">// .fade-in { animation: fadeIn 0.3s ease; }</span>
+<span class="cm">// @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }</span>
+
+template() {
+  <span class="kw">return</span> html<span class="str">`
+    &lt;div class="fade-in"&gt;${this.state.content}&lt;/div&gt;
+  `</span>
+}</code></pre>
+
+      <h3>Exit animation</h3>
+      <p>The trick: don't remove the element immediately. Mark it as "leaving," render with an exit animation class, then actually remove it when the animation finishes.</p>
+      <pre><code>removeItem(item) {
+  item.leaving = <span class="kw">true</span>       <span class="cm">// mark it</span>
+  <span class="kw">this</span>.render()              <span class="cm">// render with .leaving class</span>
+}
+
+updated() {
+  <span class="kw">const</span> el = <span class="kw">this</span>.$(<span class="str">'.leaving'</span>)
+  <span class="kw">if</span> (el) {
+    el.addEventListener(<span class="str">'animationend'</span>, () => {
+      <span class="kw">this</span>.state.items = <span class="kw">this</span>.state.items.filter(i => !i.leaving)
+      <span class="kw">this</span>.render()           <span class="cm">// now actually remove</span>
+    }, { once: <span class="kw">true</span> })
+  }
+}
+
+template() {
+  <span class="kw">return</span> html<span class="str">`
+    &lt;ul&gt;
+      ${this.state.items.map(i => html`
+        &lt;li class="${i.leaving ? 'slide-out' : ''}"&gt;${i.name}&lt;/li&gt;
+      `)}
+    &lt;/ul&gt;
+  `</span>
+}</code></pre>
+
+      <h3>FLIP technique (list reorder)</h3>
+      <p>For smooth reorder animations, capture positions before the render, then animate from old to new positions after.</p>
+      <pre><code>reorder(newItems) {
+  <span class="cm">// 1. Capture current positions</span>
+  <span class="kw">const</span> rects = <span class="kw">new</span> Map()
+  <span class="kw">this</span>.$$(<span class="str">'.item'</span>).forEach(el => {
+    rects.set(el.dataset.id, el.getBoundingClientRect())
+  })
+
+  <span class="cm">// 2. Update state and render</span>
+  <span class="kw">this</span>.state.items = newItems
+  <span class="kw">this</span>._rects = rects
+  <span class="kw">this</span>.render()
+}
+
+updated() {
+  <span class="kw">if</span> (!<span class="kw">this</span>._rects) <span class="kw">return</span>
+  <span class="kw">const</span> old = <span class="kw">this</span>._rects
+  <span class="kw">this</span>._rects = <span class="kw">null</span>
+
+  <span class="cm">// 3. Animate from old position to new</span>
+  <span class="kw">this</span>.$$(<span class="str">'.item'</span>).forEach(el => {
+    <span class="kw">const</span> prev = old.get(el.dataset.id)
+    <span class="kw">if</span> (!prev) <span class="kw">return</span>
+    <span class="kw">const</span> curr = el.getBoundingClientRect()
+    <span class="kw">const</span> dx = prev.left - curr.left
+    <span class="kw">const</span> dy = prev.top - curr.top
+    <span class="kw">if</span> (dx || dy) {
+      el.animate([
+        { transform: <span class="str">`translate(${dx}px, ${dy}px)`</span> },
+        { transform: <span class="str">'translate(0, 0)'</span> }
+      ], { duration: <span class="num">300</span>, easing: <span class="str">'ease'</span> })
+    }
+  })
+}</code></pre>
+
+      <!-- ================================================================ -->
+      <h2 id="p-async">Pattern: Async Data Loading</h2>
+      <p>Most apps fetch data. The pattern is always the same: start in a loading state, fetch in <code>connected()</code>, call <code>this.render()</code> when done. Handle errors explicitly — no Suspense boundaries, no error boundaries, just a try/catch and a state field.</p>
+
+      <pre><code><span class="kw">class</span> UserProfile <span class="kw">extends</span> CoupElement {
+  <span class="kw">static</span> tag = <span class="str">'user-profile'</span>
+  <span class="kw">static</span> props = { userId: String }
+
+  state = { user: <span class="kw">null</span>, loading: <span class="kw">true</span>, error: <span class="kw">null</span> }
+
+  <span class="kw">async</span> connected() {
+    <span class="kw">await</span> <span class="kw">this</span>.load()
+  }
+
+  propsChanged(changes) {
+    <span class="kw">if</span> (<span class="str">'userId'</span> <span class="kw">in</span> changes) <span class="kw">this</span>.load()
+  }
+
+  <span class="kw">async</span> load() {
+    <span class="kw">this</span>.state.loading = <span class="kw">true</span>
+    <span class="kw">this</span>.state.error = <span class="kw">null</span>
+    <span class="kw">this</span>.render()
+
+    <span class="kw">try</span> {
+      <span class="kw">const</span> res = <span class="kw">await</span> fetch(<span class="str">`/api/users/${this.userId}`</span>)
+      <span class="kw">if</span> (!res.ok) <span class="kw">throw</span> <span class="kw">new</span> Error(<span class="str">`${res.status}`</span>)
+      <span class="kw">this</span>.state.user = <span class="kw">await</span> res.json()
+      <span class="kw">this</span>.state.loading = <span class="kw">false</span>
+    } <span class="kw">catch</span> (e) {
+      <span class="kw">this</span>.state.error = e.message
+      <span class="kw">this</span>.state.loading = <span class="kw">false</span>
+    }
+    <span class="kw">this</span>.render()
+  }
+
+  template() {
+    <span class="kw">if</span> (<span class="kw">this</span>.state.loading) <span class="kw">return</span> html<span class="str">`&lt;p&gt;Loading...&lt;/p&gt;`</span>
+    <span class="kw">if</span> (<span class="kw">this</span>.state.error) <span class="kw">return</span> html<span class="str">`&lt;p class="error"&gt;Failed: ${this.state.error}&lt;/p&gt;`</span>
+    <span class="kw">return</span> html<span class="str">`&lt;h2&gt;${this.state.user.name}&lt;/h2&gt;`</span>
+  }
+}</code></pre>
+      <p>Notice: two <code>this.render()</code> calls — one to show the loading state immediately, one when the data arrives. Both intentional. You see exactly when the user sees what.</p>
+
+      <!-- ================================================================ -->
+      <h2 id="p-forms">Pattern: Forms</h2>
+      <p>Coup doesn't have two-way binding or controlled inputs. Instead, just read the DOM when you need the value. The simplest approach is usually the best — grab the input in the submit handler.</p>
+
+      <pre><code><span class="kw">class</span> LoginForm <span class="kw">extends</span> CoupElement {
+  <span class="kw">static</span> tag = <span class="str">'login-form'</span>
+
+  submit(e) {
+    e.preventDefault()
+    <span class="kw">const</span> email = <span class="kw">this</span>.$(<span class="str">'[name=email]'</span>).value
+    <span class="kw">const</span> password = <span class="kw">this</span>.$(<span class="str">'[name=password]'</span>).value
+    <span class="cm">// do something with email & password</span>
+  }
+
+  template() {
+    <span class="kw">return</span> html<span class="str">`
+      &lt;form @submit=${(e) => this.submit(e)}&gt;
+        &lt;input name="email" type="email" placeholder="Email"&gt;
+        &lt;input name="password" type="password" placeholder="Password"&gt;
+        &lt;button type="submit"&gt;Log in&lt;/button&gt;
+      &lt;/form&gt;
+    `</span>
+  }
+}</code></pre>
+
+      <p>For live validation or search-as-you-type, listen to <code>@input</code> and update state:</p>
+      <pre><code>template() {
+  <span class="kw">return</span> html<span class="str">`
+    &lt;input @input=${(e) => {
+      this.state.query = e.target.value
+      this.state.results = this.search(e.target.value)
+      this.render()
+    }}&gt;
+    &lt;ul&gt;
+      ${this.state.results.map(r => html`&lt;li&gt;${r}&lt;/li&gt;`)}
+    &lt;/ul&gt;
+  `</span>
+}</code></pre>
+
+      <!-- ================================================================ -->
+      <h2 id="p-third-party">Pattern: Third-Party DOM</h2>
+      <p>Some libraries — CodeMirror, Chart.js, Mapbox, YouTube embeds — need to own a chunk of the DOM. Coup plays nicely with them because <code>template()</code> just renders a container, and the library fills it in. The key: initialize in <code>updated()</code> (DOM is ready) and destroy in <code>disconnected()</code>.</p>
+
+      <pre><code><span class="kw">class</span> CodeBlock <span class="kw">extends</span> CoupElement {
+  <span class="kw">static</span> tag = <span class="str">'code-block'</span>
+  <span class="kw">static</span> props = { content: String, lang: String }
+
+  updated() {
+    <span class="cm">// Only init once — the container persists across renders</span>
+    <span class="kw">if</span> (!<span class="kw">this</span>._editor && <span class="kw">this</span>.content != <span class="kw">null</span>) {
+      <span class="kw">this</span>._editor = <span class="kw">new</span> CodeMirrorEditor({
+        parent: <span class="kw">this</span>.$(<span class="str">'.editor-mount'</span>),
+        doc: <span class="kw">this</span>.content,
+      })
+    }
+  }
+
+  propsChanged(changes) {
+    <span class="cm">// Content changed — update the editor, not the DOM</span>
+    <span class="kw">if</span> (<span class="str">'content'</span> <span class="kw">in</span> changes && <span class="kw">this</span>._editor) {
+      <span class="kw">this</span>._editor.dispatch({
+        changes: { from: <span class="num">0</span>, to: <span class="kw">this</span>._editor.state.doc.length, insert: <span class="kw">this</span>.content }
+      })
+    }
+  }
+
+  disconnected() {
+    <span class="kw">this</span>._editor?.destroy()
+  }
+
+  template() {
+    <span class="cm">// Just a container — CodeMirror owns everything inside it</span>
+    <span class="kw">return</span> html<span class="str">`&lt;div class="editor-mount"&gt;&lt;/div&gt;`</span>
+  }
+}</code></pre>
+      <p>The same pattern works for any library that manages its own DOM: render an empty container, initialize in <code>updated()</code>, clean up in <code>disconnected()</code>. Coup never touches the contents — lit-html only diffs what <code>template()</code> returns.</p>
+
+      <!-- ================================================================ -->
+      <h2 id="p-debounce">Pattern: Debouncing</h2>
+      <p>Search-as-you-type, auto-save, resize handling — anytime you want to wait for the user to stop doing something before reacting. No library needed, just a timer.</p>
+
+      <pre><code><span class="kw">class</span> SearchBox <span class="kw">extends</span> CoupElement {
+  <span class="kw">static</span> tag = <span class="str">'search-box'</span>
+  state = { query: <span class="str">''</span>, results: [] }
+  _timer = <span class="kw">null</span>
+
+  onInput(e) {
+    <span class="kw">this</span>.state.query = e.target.value
+    clearTimeout(<span class="kw">this</span>._timer)
+    <span class="kw">this</span>._timer = setTimeout(() => <span class="kw">this</span>.search(), <span class="num">300</span>)
+  }
+
+  <span class="kw">async</span> search() {
+    <span class="kw">const</span> res = <span class="kw">await</span> fetch(<span class="str">`/api/search?q=${this.state.query}`</span>)
+    <span class="kw">this</span>.state.results = <span class="kw">await</span> res.json()
+    <span class="kw">this</span>.render()
+  }
+
+  disconnected() {
+    clearTimeout(<span class="kw">this</span>._timer)  <span class="cm">// always clean up</span>
+  }
+
+  template() {
+    <span class="kw">return</span> html<span class="str">`
+      &lt;input @input=${(e) => this.onInput(e)} .value=${this.state.query}&gt;
+      &lt;ul&gt;${this.state.results.map(r => html`&lt;li&gt;${r.title}&lt;/li&gt;`)}&lt;/ul&gt;
+    `</span>
+  }
+}</code></pre>
+      <p>Notice the <code>clearTimeout</code> in <code>disconnected()</code>. If the component is removed while a search is pending, the timer is cleaned up. This is the kind of thing <code>useEffect</code> cleanup handles in React — but here it's just a method you write.</p>
+
+      <!-- ================================================================ -->
+      <h2 id="p-communication">Pattern: Component Communication</h2>
+      <p>There are three ways components talk to each other. Use the simplest one that works.</p>
+
+      <h3>Parent → Child: props</h3>
+      <p>The parent renders the child with data. When the data changes, the child re-renders automatically.</p>
+      <pre><code><span class="cm">// Parent template:</span>
+html<span class="str">`&lt;user-card .name=${this.state.user.name} .role=${this.state.user.role}&gt;&lt;/user-card&gt;`</span></code></pre>
+
+      <h3>Child → Parent: emit</h3>
+      <p>The child fires an event. The parent (or any ancestor) listens via <code>static events</code>.</p>
+      <pre><code><span class="cm">// Child:</span>
+<span class="kw">this</span>.emit(<span class="str">'item:deleted'</span>, { id: <span class="kw">this</span>.itemId })
+
+<span class="cm">// Parent:</span>
+<span class="kw">static</span> events = { <span class="str">'item:deleted'</span>: <span class="str">'onItemDeleted'</span> }
+onItemDeleted(e) {
+  <span class="kw">this</span>.state.items = <span class="kw">this</span>.state.items.filter(i => i.id !== e.detail.id)
+  <span class="kw">this</span>.render()
+}</code></pre>
+
+      <h3>Any → Any: store</h3>
+      <p>When two components that aren't parent-child need to share state, use a Store. Both subscribe, both see changes.</p>
+      <pre><code><span class="cm">// store.js</span>
+<span class="kw">export</span> <span class="kw">const</span> cartStore = <span class="kw">new</span> Store({ items: [], total: <span class="num">0</span> })
+
+<span class="cm">// Any component:</span>
+<span class="kw">static</span> subscribe = [cartStore]
+template() {
+  <span class="kw">return</span> html<span class="str">`&lt;span&gt;${cartStore.state.items.length} items&lt;/span&gt;`</span>
+}</code></pre>
+      <p><strong>Rule of thumb:</strong> start with props. If the child needs to talk back, use emit. If unrelated components need the same data, use a store. Don't reach for a store until props and events feel awkward.</p>
+
+      <!-- ================================================================ -->
+      <h2 id="p-keyed-lists">Pattern: Keyed Lists</h2>
+      <p>When rendering a list with <code>.map()</code>, lit-html updates items by position. That's fine for static lists, but if items can be reordered, added in the middle, or removed, the DOM nodes get recycled in confusing ways — inputs lose focus, animations break, component state gets mixed up.</p>
+
+      <p>Use <code>repeat()</code> to tell lit-html how to track each item by identity:</p>
+      <pre><code><span class="kw">import</span> { repeat } <span class="kw">from</span> <span class="str">'coup'</span>
+
+<span class="cm">// ❌ .map() — items tracked by position</span>
+html<span class="str">`${this.state.items.map(i => html`&lt;todo-item .item=${i}&gt;&lt;/todo-item&gt;`)}`</span>
+
+<span class="cm">// ✅ repeat() — items tracked by identity</span>
+html<span class="str">`${repeat(this.state.items, i => i.id, i => html`
+  &lt;todo-item .item=${i}&gt;&lt;/todo-item&gt;
+`)}`</span></code></pre>
+
+      <p><strong>When to use which:</strong></p>
+      <ul>
+        <li><strong><code>.map()</code></strong> — list is display-only, items don't have internal state, order never changes</li>
+        <li><strong><code>repeat()</code></strong> — items can move, be inserted/removed, have focus or animations, or are coup components with their own state</li>
+      </ul>
+
+      <!-- ================================================================ -->
+      <h2 id="p-conditional">Pattern: Conditional Rendering</h2>
+      <p>Show, hide, and swap content based on state. No special directives — just JavaScript expressions inside your template.</p>
+
+      <h3>Show/hide with ternary</h3>
+      <pre><code>template() {
+  <span class="kw">return</span> html<span class="str">`
+    ${this.state.loggedIn
+      ? html`&lt;p&gt;Welcome, ${this.state.user.name}&lt;/p&gt;`
+      : html`&lt;p&gt;&lt;a href="#/login"&gt;Log in&lt;/a&gt;&lt;/p&gt;`}
+  `</span>
+}</code></pre>
+
+      <h3>Render nothing</h3>
+      <p>Use <code>nothing</code> (from lit-html) when a condition should produce zero DOM nodes — not even a comment node.</p>
+      <pre><code><span class="kw">import</span> { nothing } <span class="kw">from</span> <span class="str">'coup'</span>
+
+template() {
+  <span class="kw">return</span> html<span class="str">`
+    &lt;h1&gt;Dashboard&lt;/h1&gt;
+    ${this.state.isAdmin ? html`&lt;admin-panel&gt;&lt;/admin-panel&gt;` : nothing}
+  `</span>
+}</code></pre>
+
+      <h3>Multi-page switching</h3>
+      <p>For page-level routing or tab switching, a simple object lookup is cleaner than nested ternaries:</p>
+      <pre><code>template() {
+  <span class="kw">const</span> pages = {
+    home:     html<span class="str">`&lt;home-page&gt;&lt;/home-page&gt;`</span>,
+    settings: html<span class="str">`&lt;settings-page&gt;&lt;/settings-page&gt;`</span>,
+    profile:  html<span class="str">`&lt;profile-page .user=${this.state.user}&gt;&lt;/profile-page&gt;`</span>,
+  }
+  <span class="kw">return</span> html<span class="str">`
+    &lt;nav&gt;...&lt;/nav&gt;
+    ${pages[this.state.page] || html`&lt;not-found&gt;&lt;/not-found&gt;`}
+  `</span>
+}</code></pre>
+      <p>When you switch pages, the old component disconnects (firing <code>disconnected()</code>) and the new one connects (firing <code>connected()</code>). Cleanup and setup happen automatically.</p>
+
       <br>
       <p style="color:#8b949e; text-align:center; margin-top:2rem; padding-top:1rem; border-top:1px solid #21262d;">
-        <a href="./" style="color:#58a6ff;">Home</a> ·
-        <a href="https://github.com/sandro/coup" style="color:#58a6ff;">Source</a> ·
+        <a href="./">Home</a> ·
+        <a href="https://github.com/sandro/coup">Source</a> ·
         That's a coup.
       </p>
     </main>
