@@ -7,8 +7,126 @@ import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
-import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
-import AutoJoiner from 'tiptap-extension-auto-joiner'
+// ---------------------------------------------------------------------------
+// Drag handle — inline Tiptap extension, no npm dependency
+// Shows a grip icon next to each block. Drag to reorder.
+// ---------------------------------------------------------------------------
+import { Extension } from '@tiptap/core'
+import { Plugin } from '@tiptap/pm/state'
+import { NodeSelection } from '@tiptap/pm/state'
+
+function nearestBlock(view, y) {
+  // Walk top-level nodes to find the one closest to cursor y
+  const doc = view.state.doc
+  let best = null, bestDist = Infinity
+  doc.forEach((node, pos) => {
+    const dom = view.nodeDOM(pos)
+    if (!dom || dom.nodeType !== 1) return
+    const rect = dom.getBoundingClientRect()
+    const mid = rect.top + rect.height / 2
+    const dist = Math.abs(y - mid)
+    if (dist < bestDist) {
+      bestDist = dist
+      best = { pos, dom, rect }
+    }
+  })
+  return best
+}
+
+const DragHandle = Extension.create({
+  name: 'dragHandle',
+
+  addProseMirrorPlugins() {
+    const handle = document.createElement('div')
+    handle.className = 'drag-handle'
+    handle.draggable = true
+    handle.setAttribute('data-drag-handle', '')
+    handle.style.position = 'fixed'
+    handle.style.display = 'none'
+    document.body.appendChild(handle)
+
+    let dragPos = null
+
+    handle.addEventListener('dragstart', (e) => {
+      if (dragPos == null) return
+      const { view } = this.editor
+      const tr = view.state.tr
+      const sel = NodeSelection.create(view.state.doc, dragPos)
+      tr.setSelection(sel)
+      view.dispatch(tr)
+      view.dragging = { slice: sel.content(), move: true }
+      // Drag image — clone the block
+      const block = nearestBlock(view, handle.getBoundingClientRect().top + 10)
+      if (block?.dom) {
+        const clone = block.dom.cloneNode(true)
+        clone.style.position = 'absolute'
+        clone.style.left = '-9999px'
+        clone.style.width = block.rect.width + 'px'
+        document.body.appendChild(clone)
+        e.dataTransfer.setDragImage(clone, 0, 0)
+        setTimeout(() => clone.remove(), 0)
+      }
+    })
+
+    return [
+      new Plugin({
+        props: {
+          handleDOMEvents: {
+            mousemove: (view, event) => {
+              const block = nearestBlock(view, event.clientY)
+              if (!block) {
+                handle.style.display = 'none'
+                return false
+              }
+              const editorRect = view.dom.getBoundingClientRect()
+              handle.style.display = ''
+              handle.style.left = (editorRect.left - 24) + 'px'
+              handle.style.top = (block.rect.top + 2) + 'px'
+              dragPos = block.pos
+              return false
+            },
+            mouseleave: () => {
+              // Delay hide so user can reach the handle
+              setTimeout(() => {
+                if (!handle.matches(':hover')) {
+                  handle.style.display = 'none'
+                }
+              }, 200)
+              return false
+            },
+            drop: (view, event) => {
+              // After drop, auto-join adjacent lists of the same type
+              setTimeout(() => {
+                const { state, dispatch } = view
+                const { doc, tr } = state
+                let joined = false
+                doc.descendants((node, pos) => {
+                  if (pos === 0) return
+                  const $pos = doc.resolve(pos)
+                  if ($pos.nodeBefore && $pos.nodeBefore.type === node.type &&
+                      (node.type.name === 'bulletList' || node.type.name === 'orderedList')) {
+                    tr.join(pos)
+                    joined = true
+                    return false
+                  }
+                })
+                if (joined) dispatch(tr)
+              }, 50)
+              return false
+            },
+          },
+        },
+        view() {
+          return {
+            destroy() {
+              handle.remove()
+            },
+          }
+        },
+      }),
+    ]
+  },
+})
 
 // Simple HTML formatter — no dependencies, handles nesting and self-closing tags
 const VOID_TAGS = new Set(['area','base','br','col','embed','hr','img','input','link','meta','source','track','wbr'])
@@ -373,13 +491,7 @@ class BlockEditor extends CoupElement {
         Underline,
         Image.configure({ inline: false, allowBase64: true }),
         Placeholder.configure({ placeholder: 'Start writing…' }),
-        GlobalDragHandle.configure({
-          dragHandleWidth: 20,
-          scrollTreshold: 100,
-        }),
-        AutoJoiner.configure({
-          elementsToJoin: ['bulletList', 'orderedList'],
-        }),
+        DragHandle,
       ],
       content: INITIAL_CONTENT.trim(),
       onUpdate: ({ editor }) => {
