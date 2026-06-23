@@ -948,6 +948,256 @@ template() {
       <!-- ================================================================ -->
       <!-- PATTERNS -->
       <!-- ================================================================ -->
+      <!-- BUILDING APPS -->
+      <!-- ================================================================ -->
+
+      <h2 id="lit-html-cheat">lit-html Cheatsheet</h2>
+      <p>Coup uses <a href="https://lit.dev/docs/libraries/standalone-templates/" target="_blank">lit-html</a> for templates. If you've used React's JSX, the syntax is different but the idea is the same — you describe your UI and the library figures out the minimal DOM changes. Here's the syntax you need to know:</p>
+
+      <h3>Text and expressions</h3>
+      <pre><code>html<span class="str">`&lt;p&gt;Hello ${name}&lt;/p&gt;`</span>                  <span class="cm">// text interpolation</span>
+html<span class="str">`&lt;p&gt;${isAdmin ? 'Admin' : 'User'}&lt;/p&gt;`</span>  <span class="cm">// ternary</span>
+html<span class="str">`&lt;ul&gt;${items.map(i => html`&lt;li&gt;${i}&lt;/li&gt;`)}&lt;/ul&gt;`</span>  <span class="cm">// arrays</span></code></pre>
+
+      <h3>Attributes vs properties</h3>
+      <p>This is the biggest source of confusion. There are four prefixes:</p>
+      <table>
+        <tr><th>Syntax</th><th>What it does</th><th>When to use</th></tr>
+        <tr>
+          <td><code>attr=${val}</code></td>
+          <td>Sets an HTML attribute (always a string)</td>
+          <td>Standard HTML attributes: <code>class</code>, <code>id</code>, <code>href</code>, <code>style</code>, <code>src</code></td>
+        </tr>
+        <tr>
+          <td><code>.prop=${val}</code></td>
+          <td>Sets a JavaScript property (any type)</td>
+          <td>Passing objects, arrays, or data to coup components: <code>.items=${myArray}</code>, <code>.user=${obj}</code></td>
+        </tr>
+        <tr>
+          <td><code>?attr=${bool}</code></td>
+          <td>Adds attribute if true, removes if false</td>
+          <td>Boolean attributes: <code>?disabled=${loading}</code>, <code>?checked=${val}</code>, <code>?hidden=${!show}</code></td>
+        </tr>
+        <tr>
+          <td><code>@event=${fn}</code></td>
+          <td>Adds an event listener</td>
+          <td>Any DOM event: <code>@click</code>, <code>@input</code>, <code>@submit</code>, <code>@keydown</code></td>
+        </tr>
+      </table>
+      <p>The most common mistake: using <code>attr=${obj}</code> when you mean <code>.prop=${obj}</code>. Attributes are strings — if you pass an object as an attribute, you'll get <code>[object Object]</code> in the DOM. Use the dot prefix for anything that isn't a string.</p>
+
+      <h3>Passing data to child components</h3>
+      <pre><code><span class="cm">// ✅ Use .dot for objects, arrays, anything non-string</span>
+html<span class="str">`&lt;user-card .user=${this.state.user}&gt;&lt;/user-card&gt;`</span>
+
+<span class="cm">// ✅ Plain attributes work for strings</span>
+html<span class="str">`&lt;status-badge status="online"&gt;&lt;/status-badge&gt;`</span>
+
+<span class="cm">// ❌ This passes "[object Object]" as a string</span>
+html<span class="str">`&lt;user-card user=${this.state.user}&gt;&lt;/user-card&gt;`</span></code></pre>
+
+      <h3>Event handlers</h3>
+      <pre><code><span class="cm">// Inline arrow function</span>
+html<span class="str">`&lt;button @click=${() => this.save()}&gt;Save&lt;/button&gt;`</span>
+
+<span class="cm">// With the event object</span>
+html<span class="str">`&lt;input @input=${(e) => { this.state.q = e.target.value; this.render() }}&gt;`</span>
+
+<span class="cm">// Prevent default (forms, links)</span>
+html<span class="str">`&lt;form @submit=${(e) => { e.preventDefault(); this.send() }}&gt;`</span></code></pre>
+
+      <h3>Rendering nothing</h3>
+      <pre><code><span class="kw">import</span> { nothing } <span class="kw">from</span> <span class="str">'coup'</span>
+
+<span class="cm">// nothing = zero DOM nodes. Use instead of '' or null to avoid empty text nodes.</span>
+html<span class="str">`${this.state.error ? html`&lt;p class="err"&gt;${this.state.error}&lt;/p&gt;` : nothing}`</span></code></pre>
+
+      <!-- ================================================================ -->
+      <h2 id="styling">Styling</h2>
+      <p>Coup renders into the light DOM — no Shadow DOM, no CSS encapsulation boundary. This is a feature, not a limitation. Your components are just HTML elements, and you style them with regular CSS.</p>
+
+      <h3>Component-scoped styles via tag name</h3>
+      <p>Since every component has a unique tag name, use it as your scope:</p>
+      <pre><code><span class="cm">/* Styles only apply inside &lt;task-list&gt; elements */</span>
+task-list {
+  display: block;
+  padding: <span class="num">1</span>rem;
+}
+task-list .item {
+  border-bottom: <span class="num">1</span>px solid #eee;
+  padding: <span class="num">0.5</span>rem <span class="num">0</span>;
+}
+task-list .item.done {
+  opacity: <span class="num">0.5</span>;
+  text-decoration: line-through;
+}</code></pre>
+      <p>This gives you practical scoping without the complexity of shadow DOM. Can styles leak? Yes — but that's also why they compose. Your app's base styles (fonts, colors, resets) apply everywhere, including inside components. That's usually what you want.</p>
+
+      <h3>Inline styles for dynamic values</h3>
+      <pre><code>html<span class="str">`&lt;div style="background:${this.color}; opacity:${this.active ? 1 : 0.5}"&gt;`</span></code></pre>
+
+      <h3>CSS files per component</h3>
+      <p>For larger apps, put each component's styles in a CSS file that mirrors the JS file:</p>
+      <pre><code>components/
+  task-list.js
+  task-list.css    <span class="cm">← imported via &lt;link&gt; in index.html</span>
+  task-item.js
+  task-item.css</code></pre>
+
+      <!-- ================================================================ -->
+      <h2 id="project-structure">Project Structure</h2>
+      <p>Coup doesn't have a CLI or prescribed layout. Here's what works well as your app grows:</p>
+
+      <h3>Small app (1–5 components)</h3>
+      <pre><code>index.html          <span class="cm">← importmap, styles, &lt;my-app&gt;</span>
+app.js              <span class="cm">← all components in one file</span></code></pre>
+      <p>This is how all 7 coup examples are structured. One HTML file, one JS file. When a file hits ~400 lines, split it up.</p>
+
+      <h3>Medium app (5–20 components)</h3>
+      <pre><code>index.html
+js/
+  app.js            <span class="cm">← root component, imports others</span>
+  store.js          <span class="cm">← shared stores</span>
+  components/
+    header.js
+    sidebar.js
+    task-list.js
+    task-item.js
+css/
+  base.css          <span class="cm">← resets, variables, typography</span>
+  components.css    <span class="cm">← all component styles</span></code></pre>
+
+      <h3>Large app (Hector-scale)</h3>
+      <pre><code>index.html
+coup/               <span class="cm">← coup source (vendored or symlinked)</span>
+  index.js
+  router.js
+js/
+  app.js
+  store.js          <span class="cm">← global app store</span>
+  db.js             <span class="cm">← IndexedDB wrapper</span>
+  components/
+    editor.js       <span class="cm">← CodeMirror integration</span>
+    preview.js      <span class="cm">← live preview with iframe</span>
+    file-browser.js
+    settings.js
+vendor/
+  codemirror.js     <span class="cm">← vendored third-party libs</span></code></pre>
+
+      <h3>Rules of thumb</h3>
+      <ul>
+        <li><strong>One component per file</strong> once you have more than 3 components. Small helper components can share a file with their parent.</li>
+        <li><strong>One store per concern</strong> — <code>authStore</code>, <code>projectStore</code>, <code>uiStore</code>. Don't put everything in one mega-store.</li>
+        <li><strong>Import from <code>index.html</code></strong> — your importmap is the dependency manifest. No <code>package.json</code>, no <code>node_modules</code> for app code.</li>
+        <li><strong>Vendor heavy libraries</strong> — copy CodeMirror, Tiptap, etc. into a <code>vendor/</code> folder or use esm.sh CDN URLs. Either works.</li>
+      </ul>
+
+      <!-- ================================================================ -->
+      <h2 id="gotchas">Common Mistakes</h2>
+      <p>These are the bugs we found while building <a href="https://github.com/sandro/hector" target="_blank">Hector</a>, a full app powered by coup. Learn from our mistakes.</p>
+
+      <h3>Forgetting <code>this.render()</code></h3>
+      <p>The most common mistake. You update state but nothing changes on screen.</p>
+      <pre><code><span class="cm">// ❌ Nothing happens — DOM is stale</span>
+<span class="kw">this</span>.state.count++
+
+<span class="cm">// ✅ DOM updates</span>
+<span class="kw">this</span>.state.count++
+<span class="kw">this</span>.render()</code></pre>
+      <p>Turn on debug mode (<code>CoupElement.debug = true</code>) during development — it warns when you mutate state without rendering.</p>
+
+      <h3>Overriding <code>connectedCallback</code> instead of <code>connected()</code></h3>
+      <p>Coup sets up props, stores, and events in <code>connectedCallback</code>. If you override it, you skip that setup.</p>
+      <pre><code><span class="cm">// ❌ Breaks prop/store setup</span>
+connectedCallback() {
+  <span class="kw">this</span>.loadData()
+}
+
+<span class="cm">// ✅ Use the clean hook</span>
+connected() {
+  <span class="kw">this</span>.loadData()
+}</code></pre>
+
+      <h3>Passing objects without the dot prefix</h3>
+      <pre><code><span class="cm">// ❌ Attributes are strings — this sets item="[object Object]"</span>
+html<span class="str">`&lt;task-item item=${obj}&gt;&lt;/task-item&gt;`</span>
+
+<span class="cm">// ✅ Dot prefix passes the JavaScript value</span>
+html<span class="str">`&lt;task-item .item=${obj}&gt;&lt;/task-item&gt;`</span></code></pre>
+
+      <h3>Async <code>storeChanged</code> without <code>this.render()</code></h3>
+      <p>If you define <code>storeChanged</code>, coup doesn't auto-render — you own it. If your <code>storeChanged</code> does async work and never calls <code>this.render()</code>, the component goes stale.</p>
+      <pre><code><span class="cm">// ❌ Component never updates</span>
+<span class="kw">async</span> storeChanged(store, state) {
+  <span class="kw">await</span> <span class="kw">this</span>.loadData()
+  <span class="cm">// forgot this.render()</span>
+}
+
+<span class="cm">// ✅ Render when the async work is done</span>
+<span class="kw">async</span> storeChanged(store, state) {
+  <span class="kw">await</span> <span class="kw">this</span>.loadData()
+  <span class="kw">this</span>.render()
+}</code></pre>
+
+      <h3>Leaking event listeners</h3>
+      <p>If you manually add event listeners in <code>connected()</code>, always remove them in <code>disconnected()</code>. Better yet, use <code>static events</code> — coup handles cleanup automatically.</p>
+      <pre><code><span class="cm">// ❌ Leaks — anonymous function can't be removed</span>
+connected() {
+  window.addEventListener(<span class="str">'resize'</span>, () => <span class="kw">this</span>.onResize())
+}
+
+<span class="cm">// ✅ Option A: save the reference</span>
+connected() {
+  <span class="kw">this</span>._onResize = () => <span class="kw">this</span>.onResize()
+  window.addEventListener(<span class="str">'resize'</span>, <span class="kw">this</span>._onResize)
+}
+disconnected() {
+  window.removeEventListener(<span class="str">'resize'</span>, <span class="kw">this</span>._onResize)
+}
+
+<span class="cm">// ✅ Option B: let coup handle it</span>
+<span class="kw">static</span> events = { <span class="str">'resize'</span>: <span class="str">'onResize'</span> }</code></pre>
+
+      <h3>Not cleaning up timers</h3>
+      <pre><code><span class="cm">// ❌ Timer fires after component is removed — error or stale render</span>
+connected() {
+  setInterval(() => <span class="kw">this</span>.tick(), <span class="num">1000</span>)
+}
+
+<span class="cm">// ✅ Save the ID, clear on disconnect</span>
+connected() {
+  <span class="kw">this</span>._timer = setInterval(() => <span class="kw">this</span>.tick(), <span class="num">1000</span>)
+}
+disconnected() {
+  clearInterval(<span class="kw">this</span>._timer)
+}</code></pre>
+
+      <!-- ================================================================ -->
+      <h2 id="deployment">Deployment</h2>
+      <p>Coup apps are static files. No server-side rendering, no serverless functions, no build artifacts. Push your HTML, JS, and CSS to any static host and you're live.</p>
+
+      <h3>GitHub Pages</h3>
+      <pre><code>git push origin main
+<span class="cm"># That's it. Settings → Pages → deploy from main branch.</span></code></pre>
+
+      <h3>Any static host</h3>
+      <p>Netlify, Vercel, Cloudflare Pages, S3, Surge — anything that serves files works. No build command, no output directory configuration. The source <em>is</em> the build.</p>
+
+      <h3>Local development</h3>
+      <p>You need a local server (ES modules don't load from <code>file://</code>). Any of these work:</p>
+      <pre><code><span class="cm"># Python</span>
+python3 -m http.server <span class="num">3000</span>
+
+<span class="cm"># Node</span>
+npx serve . -p <span class="num">3000</span>
+
+<span class="cm"># PHP</span>
+php -S localhost:<span class="num">3000</span></code></pre>
+      <p>No hot module replacement, no file watchers, no dev server config. Refresh the browser. Your code is your code — the browser runs it directly.</p>
+
+      <!-- ================================================================ -->
+      <!-- PATTERNS -->
+      <!-- ================================================================ -->
 
       <h2 id="p-animations">Pattern: Animations</h2>
       <p>Coup doesn't have an animation system — the browser already has a great one. The key insight: <code>updated()</code> fires after the DOM renders, so it's the perfect place to trigger enter animations. Exit animations need a bit more thought because you have to delay removal until the animation finishes.</p>
