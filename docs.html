@@ -1071,7 +1071,7 @@ css/
   base.css          <span class="cm">← resets, variables, typography</span>
   components.css    <span class="cm">← all component styles</span></code></pre>
 
-      <h3>Large app (Hector-scale)</h3>
+      <h3>Large app (20+ components)</h3>
       <pre><code>index.html
 coup/               <span class="cm">← coup source (vendored or symlinked)</span>
   index.js
@@ -1098,7 +1098,7 @@ vendor/
 
       <!-- ================================================================ -->
       <h2 id="gotchas">Common Mistakes</h2>
-      <p>These are the bugs we found while building <a href="https://github.com/sandro/hector" target="_blank">Hector</a>, a full app powered by coup. Learn from our mistakes.</p>
+      <p>These are real bugs we hit while building production apps with coup. Learn from our mistakes.</p>
 
       <h3>Forgetting <code>this.render()</code></h3>
       <p>The most common mistake. You update state but nothing changes on screen.</p>
