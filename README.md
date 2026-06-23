@@ -1,10 +1,14 @@
 # coup
 
-A zero-build web component library where **you** control the render loop.
+A coup against the tyranny of the modern frontend.
 
-Coup is syntactic sugar on top of [Web Components](https://developer.mozilla.org/en-US/docs/Web/API/Web_components) and [lit-html](https://lit.dev/docs/libraries/standalone-templates/). It gives you reactive props, global event wiring, and efficient DOM diffing — without a virtual DOM, build step, or automatic renders you didn't ask for.
+You don't need a build step. You don't need a virtual DOM. You don't need hooks, signals, effects, memos, reducers, selectors, or a PhD in reactivity theory to put HTML on a screen.
 
-**~250 lines of code.** lit-html (~3KB gzip) is the only dependency.
+You need a component. You need a template. You need to decide when to render. That's coup.
+
+**~250 lines of code. One dependency ([lit-html](https://lit.dev/docs/libraries/standalone-templates/), ~3KB gzip). No build step. No CLI. No starter template.**
+
+> **[Live examples →](https://sandro.github.io/coup/)**
 
 ```
 ┌──────────────────────────────────────┐
@@ -753,6 +757,7 @@ examples/
   4-chat/       — room switching, component destruction, timers
   5-github/     — fetch API, loading/error states, sorting
   6-bookmarks/  — shared Store, search, tag filtering, derived data
+  7-editor/     — block editor, Tiptap + CodeMirror, bidirectional sync
 ```
 
 Run any example: `npx serve . -p 3000` then open `/examples/1-hello/`.
