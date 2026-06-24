@@ -1279,7 +1279,79 @@ php -S localhost:<span class="num">3000</span></code></pre>
         <li><code>toast(message)</code> — emits a global event that a toast component listens for</li>
         <li><code>track(event, data)</code> — analytics wrapper</li>
       </ul>
-      <p>Keep the base class small. If only some components need a capability, use composition (import a function) instead of inheritance (put it in the base class).</p>
+      <p>Keep the base class small. If only some components need a capability, use composition instead — import a function, not a base class.</p>
+
+      <h3>Composition over inheritance</h3>
+      <p>Instead of baking capabilities into a base class that every component inherits, write small composable helpers that only the components that need them opt into:</p>
+
+      <pre><code><span class="cm">// fetchable.js — composable fetch helper</span>
+<span class="kw">export</span> <span class="kw">function</span> fetchable() {
+  <span class="kw">let</span> abort = <span class="kw">new</span> AbortController()
+  <span class="kw">return</span> {
+    get signal() { <span class="kw">return</span> abort.signal },
+    restart() {
+      abort.abort()
+      abort = <span class="kw">new</span> AbortController()
+      <span class="kw">return</span> abort.signal
+    },
+    destroy() { abort.abort() }
+  }
+}</code></pre>
+
+      <pre><code><span class="cm">// Only components that fetch use it</span>
+<span class="kw">import</span> { fetchable } <span class="kw">from</span> <span class="str">'./fetchable.js'</span>
+
+<span class="kw">class</span> UserProfile <span class="kw">extends</span> CoupElement {
+  <span class="kw">static</span> tag = <span class="str">'user-profile'</span>
+  <span class="kw">static</span> props = { userId: String }
+  state = { user: <span class="kw">null</span>, loading: <span class="kw">true</span> }
+
+  connected() {
+    <span class="kw">this</span>._fetch = fetchable()
+    <span class="kw">this</span>.loadUser()
+  }
+
+  disconnected() {
+    <span class="kw">this</span>._fetch.destroy()
+  }
+
+  propsChanged(changes) {
+    <span class="kw">if</span> (<span class="str">'userId'</span> <span class="kw">in</span> changes) <span class="kw">this</span>.loadUser()
+  }
+
+  <span class="kw">async</span> loadUser() {
+    <span class="kw">const</span> signal = <span class="kw">this</span>._fetch.restart()
+    <span class="kw">this</span>.state.loading = <span class="kw">true</span>
+    <span class="kw">this</span>.render()
+    <span class="kw">try</span> {
+      <span class="kw">const</span> res = <span class="kw">await</span> fetch(<span class="str">`/api/users/${this.userId}`</span>, { signal })
+      <span class="kw">this</span>.state.user = <span class="kw">await</span> res.json()
+    } <span class="kw">catch</span> (e) {
+      <span class="kw">if</span> (e.name === <span class="str">'AbortError'</span>) <span class="kw">return</span>
+      <span class="kw">throw</span> e
+    }
+    <span class="kw">this</span>.state.loading = <span class="kw">false</span>
+    <span class="kw">this</span>.render()
+  }
+
+  template() { <span class="cm">/* ... */</span> }
+}</code></pre>
+
+      <p>The power of composition: you can mix multiple capabilities without an inheritance chain:</p>
+
+      <pre><code>connected() {
+  <span class="kw">this</span>._fetch = fetchable()
+  <span class="kw">this</span>._resize = resizeObserver(<span class="kw">this</span>, () => <span class="kw">this</span>.render())
+  <span class="kw">this</span>._keys = keyboard(<span class="kw">this</span>, { <span class="str">'Cmd+S'</span>: () => <span class="kw">this</span>.save() })
+}
+
+disconnected() {
+  <span class="kw">this</span>._fetch.destroy()
+  <span class="kw">this</span>._resize.destroy()
+  <span class="kw">this</span>._keys.destroy()
+}</code></pre>
+
+      <p><strong>When to use which:</strong> if every component in your app needs it (auth, analytics), put it in a base class. If only some components need it (fetching, resize observers, keyboard shortcuts), use composition.</p>
 
       <!-- ================================================================ -->
 
