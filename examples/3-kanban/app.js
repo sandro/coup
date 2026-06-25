@@ -25,18 +25,16 @@ class KanbanCard extends CoupElement {
   static tag = 'kanban-card'
   static props = { card: Object }
 
-  state = { dragging: false }
+  static state = { dragging: false }
 
   onDragStart(e) {
-    this.state.dragging = true
-    this.render()
+    this.dragging = true
     e.dataTransfer.setData('text/plain', String(this.card.id))
     e.dataTransfer.effectAllowed = 'move'
   }
 
   onDragEnd() {
-    this.state.dragging = false
-    this.render()
+    this.dragging = false
   }
 
   deleteCard() {
@@ -59,7 +57,7 @@ class KanbanCard extends CoupElement {
 
     return html`
       <div
-        class="card ${this.state.dragging ? 'dragging' : ''}"
+        class="card ${this.dragging ? 'dragging' : ''}"
         draggable="true"
         @dragstart=${(e) => this.onDragStart(e)}
         @dragend=${() => this.onDragEnd()}
@@ -92,7 +90,7 @@ class KanbanColumn extends CoupElement {
   static tag = 'kanban-column'
   static props = { name: String, cards: Array }
 
-  state = { dragOver: false, dropIndex: -1 }
+  static state = { dragOver: false, dropIndex: -1 }
 
   addCard(e) {
     e.preventDefault()
@@ -116,34 +114,31 @@ class KanbanColumn extends CoupElement {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
     const idx = this._getDropIndex(e)
-    if (!this.state.dragOver || this.state.dropIndex !== idx) {
-      this.state.dragOver = true
-      this.state.dropIndex = idx
-      this.render()
+    if (!this.dragOver || this.dropIndex !== idx) {
+      this.dragOver = true
+      this.dropIndex = idx
     }
   }
 
   onDragLeave(e) {
     // Only leave if we actually left the column (not entering a child)
     if (e.currentTarget.contains(e.relatedTarget)) return
-    this.state.dragOver = false
-    this.state.dropIndex = -1
-    this.render()
+    this.dragOver = false
+    this.dropIndex = -1
   }
 
   onDrop(e) {
     e.preventDefault()
-    const dropIndex = this.state.dropIndex
-    this.state.dragOver = false
-    this.state.dropIndex = -1
+    const dropIndex = this.dropIndex
+    this.dragOver = false
+    this.dropIndex = -1
     const cardId = Number(e.dataTransfer.getData('text/plain'))
     this.emit('card:move', { id: cardId, column: this.name, index: dropIndex })
-    this.render()
   }
 
   template() {
     const cards = this.cards || []
-    const { dragOver, dropIndex } = this.state
+    const { dragOver, dropIndex } = this
     const indicator = html`<div class="drop-indicator"></div>`
 
     return html`
@@ -191,7 +186,7 @@ class KanbanBoard extends CoupElement {
     'card:move':   'onMove',
   }
 
-  state = { cards: [...SEED] }
+  static state = { cards: [...SEED] }
 
   onAdd(e) {
     const card = {
@@ -200,20 +195,18 @@ class KanbanBoard extends CoupElement {
       column: e.detail.column,
       priority: 'medium',
     }
-    this.state.cards = [...this.state.cards, card]
-    this.render()
+    this.cards = [...this.cards, card]
   }
 
   onDelete(e) {
-    this.state.cards = this.state.cards.filter(c => c.id !== e.detail.id)
-    this.render()
+    this.cards = this.cards.filter(c => c.id !== e.detail.id)
   }
 
   onMove(e) {
     const { id, column, index } = e.detail
-    const card = this.state.cards.find(c => c.id === id)
+    const card = this.cards.find(c => c.id === id)
     if (!card) return
-    const without = this.state.cards.filter(c => c.id !== id)
+    const without = this.cards.filter(c => c.id !== id)
     const moved = { ...card, column }
 
     if (index !== undefined) {
@@ -234,19 +227,18 @@ class KanbanBoard extends CoupElement {
         result.push(c)
       }
       if (!inserted) result.push(moved) // append at end
-      this.state.cards = result
+      this.cards = result
     } else {
       // Button move — append to end
-      this.state.cards = [...without, moved]
+      this.cards = [...without, moved]
     }
-    this.render()
   }
 
   template() {
     return html`
       <div class="board">
         ${COLUMNS.map(col => {
-          const cards = this.state.cards.filter(c => c.column === col)
+          const cards = this.cards.filter(c => c.column === col)
           return html`
             <kanban-column .name=${col} .cards=${cards}></kanban-column>
           `

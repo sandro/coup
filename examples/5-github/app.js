@@ -8,7 +8,7 @@ import { CoupElement, html, nothing, repeat } from 'coup'
 class GithubExplorer extends CoupElement {
   static tag = 'github-explorer'
 
-  state = {
+  static state = {
     query: '',
     user: null,
     repos: [],
@@ -30,12 +30,11 @@ class GithubExplorer extends CoupElement {
   }
 
   async loadUser(query) {
-    this.state.query = query
-    this.state.loading = true
-    this.state.error = null
-    this.state.user = null
-    this.state.repos = []
-    this.render()
+    this.query = query
+    this.loading = true
+    this.error = null
+    this.user = null
+    this.repos = []
 
     try {
       const [userRes, reposRes] = await Promise.all([
@@ -50,26 +49,22 @@ class GithubExplorer extends CoupElement {
         )
       }
 
-      this.state.user = await userRes.json()
-      this.state.repos = reposRes.ok ? await reposRes.json() : []
-      this.state.loading = false
+      this.user = await userRes.json()
+      this.repos = reposRes.ok ? await reposRes.json() : []
+      this.loading = false
     } catch (err) {
-      this.state.error = err.message
-      this.state.loading = false
+      this.error = err.message
+      this.loading = false
     }
-
-    // Safe — if component disconnected during fetch, this is a no-op
-    this.render()
   }
 
   setSort(sort) {
-    this.state.sort = sort
-    this.render()
+    this.sort = sort
   }
 
   get sortedRepos() {
-    const repos = [...this.state.repos]
-    switch (this.state.sort) {
+    const repos = [...this.repos]
+    switch (this.sort) {
       case 'stars': return repos.sort((a, b) => b.stargazers_count - a.stargazers_count)
       case 'forks': return repos.sort((a, b) => b.forks_count - a.forks_count)
       case 'updated': return repos.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
@@ -79,44 +74,43 @@ class GithubExplorer extends CoupElement {
   }
 
   template() {
-    const { user, loading, error, sort } = this.state
     return html`
       <form class="search-bar" @submit=${(e) => this.search(e)}>
         <input
           type="text"
           placeholder="Enter a GitHub username..."
-          value=${this.state.query}
-          ?disabled=${loading}
+          value=${this.query}
+          ?disabled=${this.loading}
         >
-        <button type="submit" ?disabled=${loading}>
-          ${loading ? 'Searching...' : 'Search'}
+        <button type="submit" ?disabled=${this.loading}>
+          ${this.loading ? 'Searching...' : 'Search'}
         </button>
       </form>
 
-      ${error ? html`<div class="error">⚠️ ${error}</div>` : nothing}
+      ${this.error ? html`<div class="error">⚠️ ${this.error}</div>` : nothing}
 
-      ${loading ? html`<div class="loading">Loading...</div>` : nothing}
+      ${this.loading ? html`<div class="loading">Loading...</div>` : nothing}
 
-      ${user ? html`
+      ${this.user ? html`
         <div class="user-card">
-          <img src=${user.avatar_url} alt=${user.login}>
+          <img src=${this.user.avatar_url} alt=${this.user.login}>
           <div>
-            <h2>${user.name || user.login}</h2>
-            ${user.bio ? html`<p>${user.bio}</p>` : nothing}
+            <h2>${this.user.name || this.user.login}</h2>
+            ${this.user.bio ? html`<p>${this.user.bio}</p>` : nothing}
             <div class="stats">
-              <span>📦 ${user.public_repos} repos</span>
-              <span>👥 ${user.followers} followers</span>
-              <span>👤 ${user.following} following</span>
-              <a href=${user.html_url} target="_blank">View on GitHub ↗</a>
+              <span>📦 ${this.user.public_repos} repos</span>
+              <span>👥 ${this.user.followers} followers</span>
+              <span>👤 ${this.user.following} following</span>
+              <a href=${this.user.html_url} target="_blank">View on GitHub ↗</a>
             </div>
           </div>
         </div>
 
-        ${this.state.repos.length > 0 ? html`
+        ${this.repos.length > 0 ? html`
           <div class="sort-bar">
             ${['stars', 'forks', 'updated', 'name'].map(s => html`
               <button
-                class=${s === sort ? 'active' : ''}
+                class=${s === this.sort ? 'active' : ''}
                 @click=${() => this.setSort(s)}
               >
                 ${{ stars: '⭐ Stars', forks: '🍴 Forks', updated: '🕐 Updated', name: '🔤 Name' }[s]}

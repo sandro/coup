@@ -472,17 +472,20 @@ class BlockEditor extends CoupElement {
     'code:changed': 'onCodeChanged',
   }
 
-  state = {
-    mode: 'split',     // 'write' | 'split' | 'code'
-    editor: null,       // Tiptap Editor instance
-    htmlContent: '',    // current HTML string for code view
+  static state = {
+    mode: 'split',       // 'write' | 'split' | 'code'
+    htmlContent: '',     // current HTML string for code view
   }
+
+  // Third-party DOM refs and flags — not reactive
+  _editor = null        // Tiptap Editor instance
+  _editorEl = null
+  _suppressUpdate = false
 
   connected() {
     // Create Tiptap editor
     const editorEl = document.createElement('div')
     this._editorEl = editorEl
-    this._suppressUpdate = false
 
     const editor = new Editor({
       element: editorEl,
@@ -497,54 +500,52 @@ class BlockEditor extends CoupElement {
       onUpdate: ({ editor }) => {
         if (this._suppressUpdate) return
         // Tiptap → code view sync
-        this.state.htmlContent = editor.getHTML()
-        this.render()
+        this.htmlContent = editor.getHTML()
       },
     })
 
-    this.state.editor = editor
-    this.state.htmlContent = editor.getHTML()
-    this.render()
+    this._editor = editor
+    this.htmlContent = editor.getHTML()
   }
 
   disconnected() {
-    if (this.state.editor) {
-      this.state.editor.destroy()
-      this.state.editor = null
+    if (this._editor) {
+      this._editor.destroy()
+      this._editor = null
     }
   }
 
-  updated() {
+  firstUpdated() {
     // Mount Tiptap's element into the wysiwyg pane
     const pane = this.$('.wysiwyg-pane')
-    if (pane && this._editorEl && !pane.contains(this._editorEl)) {
+    if (pane && this._editorEl) {
       pane.appendChild(this._editorEl)
     }
   }
 
   onModeChange(e) {
-    this.state.mode = e.detail
-    this.render()
+    this.mode = e.detail
   }
 
   onCodeChanged(e) {
     // CodeMirror → Tiptap sync
     const newHTML = e.detail
-    if (!this.state.editor) return
+    if (!this._editor) return
 
     // Only update if content actually differs (prevents loops)
-    const currentHTML = this.state.editor.getHTML()
+    const currentHTML = this._editor.getHTML()
     if (newHTML !== currentHTML) {
       // Temporarily suppress Tiptap's onUpdate to prevent bounce-back
       this._suppressUpdate = true
-      this.state.editor.commands.setContent(newHTML, false)
-      this.state.htmlContent = newHTML
+      this._editor.commands.setContent(newHTML, false)
+      this.htmlContent = newHTML
       this._suppressUpdate = false
     }
   }
 
   template() {
-    const { mode, editor, htmlContent } = this.state
+    const { mode, htmlContent } = this
+    const editor = this._editor
     const showWysiwyg = mode === 'write' || mode === 'split'
     const showCode = mode === 'split' || mode === 'code'
 
