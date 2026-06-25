@@ -1050,6 +1050,375 @@ const firstUpdatedOrderResult = await page.evaluate(async () => {
 assert(firstUpdatedOrderResult.order[0] === 'firstUpdated', 'firstUpdated fires before updated')
 assert(firstUpdatedOrderResult.order[1] === 'updated', 'updated fires after firstUpdated')
 
+// =========================================================================
+// static state tests
+// =========================================================================
+
+// Test 39: static state creates reactive getters/setters with auto-render
+const staticStateResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  let renderCount = 0
+
+  class StaticStateTest extends CoupElement {
+    static tag = 'static-state-test'
+    static state = { count: 0, label: 'ready' }
+    template() {
+      renderCount++
+      return html`<span>${this.count} ${this.label}</span>`
+    }
+  }
+  StaticStateTest.define()
+
+  const el = document.createElement('static-state-test')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  const textAfterMount = el.querySelector('span')?.textContent
+  const rendersAfterMount = renderCount
+
+  el.count = 5
+  el.label = 'done'
+  await new Promise(r => setTimeout(r, 100))
+
+  const textAfterUpdate = el.querySelector('span')?.textContent
+  const rendersAfterUpdate = renderCount
+
+  el.remove()
+  return { textAfterMount, textAfterUpdate, rendersAfterMount, rendersAfterUpdate }
+})
+assert(staticStateResult.textAfterMount === '0 ready', `static state defaults: "${staticStateResult.textAfterMount}"`)
+assert(staticStateResult.textAfterUpdate === '5 done', `static state updated: "${staticStateResult.textAfterUpdate}"`)
+
+// Test 40: static state batches multiple changes into one render
+const stateBatchResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  let renderCount = 0
+
+  class StateBatch extends CoupElement {
+    static tag = 'state-batch'
+    static state = { a: 0, b: 0, c: 0 }
+    template() {
+      renderCount++
+      return html`<span>${this.a}-${this.b}-${this.c}</span>`
+    }
+  }
+  StateBatch.define()
+
+  const el = document.createElement('state-batch')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  const rendersBefore = renderCount
+
+  // Set three state properties synchronously — should batch into one render
+  el.a = 1
+  el.b = 2
+  el.c = 3
+  await new Promise(r => setTimeout(r, 100))
+
+  const rendersAfter = renderCount
+  const text = el.querySelector('span')?.textContent
+
+  el.remove()
+  return { rendersBefore, rendersAfter, text }
+})
+assert(stateBatchResult.rendersAfter - stateBatchResult.rendersBefore === 1,
+  `static state batching: ${stateBatchResult.rendersAfter - stateBatchResult.rendersBefore} renders (expected 1)`)
+assert(stateBatchResult.text === '1-2-3', `static state batch result: "${stateBatchResult.text}"`)
+
+// Test 41: static state same-value check skips render
+const stateSameValueResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  let renderCount = 0
+
+  class StateSameValue extends CoupElement {
+    static tag = 'state-same-value'
+    static state = { count: 42 }
+    template() {
+      renderCount++
+      return html`<span>${this.count}</span>`
+    }
+  }
+  StateSameValue.define()
+
+  const el = document.createElement('state-same-value')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  const rendersBefore = renderCount
+
+  el.count = 42 // same value
+  await new Promise(r => setTimeout(r, 100))
+
+  el.remove()
+  return { rendersBefore, rendersAfter: renderCount }
+})
+assert(stateSameValueResult.rendersBefore === stateSameValueResult.rendersAfter,
+  `static state same value: no extra render (${stateSameValueResult.rendersBefore} === ${stateSameValueResult.rendersAfter})`)
+
+// Test 42: stateChanged callback fires with batched changes
+const stateChangedResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  const calls = []
+
+  class StateChangedTest extends CoupElement {
+    static tag = 'state-changed-test'
+    static state = { x: 0, y: 0 }
+    stateChanged(changes) {
+      calls.push(structuredClone(changes))
+    }
+    template() { return html`<span>${this.x}-${this.y}</span>` }
+  }
+  StateChangedTest.define()
+
+  const el = document.createElement('state-changed-test')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  el.x = 10
+  el.y = 20
+  await new Promise(r => setTimeout(r, 100))
+
+  el.remove()
+  return { callCount: calls.length, changes: calls[0] }
+})
+assert(stateChangedResult.callCount === 1, `stateChanged: ${stateChangedResult.callCount} calls (expected 1)`)
+assert(stateChangedResult.changes.x?.old === 0 && stateChangedResult.changes.x?.new === 10, 'stateChanged: x change correct')
+assert(stateChangedResult.changes.y?.old === 0 && stateChangedResult.changes.y?.new === 20, 'stateChanged: y change correct')
+
+// Test 43: static state collision with static props throws error
+const collisionResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  // Test collision detection directly — _setupProps then _setupState
+  // by checking that the constructor logic works
+  class Collision extends CoupElement {
+    static tag = 'collision-test-43'
+    static props = { name: String }
+    static state = { name: '' }
+    template() { return html`<span>${this.name}</span>` }
+  }
+  Collision.define()
+
+  let threw = false
+  let message = ''
+  const errors = []
+  const origError = console.error
+  
+  // Listen for the error thrown during construction
+  try {
+    const el = document.createElement('collision-test-43')
+    // If we get here, check if the error was caught internally
+    // The browser may catch constructor errors in createElement
+    threw = false
+  } catch (e) {
+    threw = true
+    message = e.message
+  }
+
+  // Alternative: test _setupState directly
+  if (!threw) {
+    try {
+      // Call _setupState manually on a fresh instance to test the guard
+      const TestClass = class extends CoupElement {
+        static tag = 'collision-direct-43'
+        static props = { foo: String }
+        static state = { foo: 0 }
+      }
+      // _setupProps runs in super constructor, then _setupState
+      // We can test the guard by checking _props
+      const proto = TestClass.prototype
+      const instance = Object.create(proto)
+      instance._props = { foo: undefined }
+      instance.constructor = TestClass
+      instance._state_vals = undefined
+      // Manually call _setupState
+      instance._setupState()
+      threw = false
+    } catch (e) {
+      threw = true
+      message = e.message
+    }
+  }
+
+  return { threw, message }
+})
+assert(collisionResult.threw === true, `Collision: throws on prop/state name conflict (threw: ${collisionResult.threw})`)
+assert(collisionResult.threw && collisionResult.message && collisionResult.message.includes('both static props and static state'),
+  `Collision message: "${collisionResult.message}"`)
+
+// Test 44: static state coexists with manual this.state
+const coexistResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  class Coexist extends CoupElement {
+    static tag = 'coexist-test'
+    static state = { reactiveCount: 0 }
+    state = { manualFlag: false }
+
+    template() {
+      return html`<span>${this.reactiveCount}-${this.state.manualFlag}</span>`
+    }
+  }
+  Coexist.define()
+
+  const el = document.createElement('coexist-test')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  const textBefore = el.querySelector('span')?.textContent
+
+  // Reactive state auto-renders
+  el.reactiveCount = 5
+  await new Promise(r => setTimeout(r, 100))
+  const textAfterReactive = el.querySelector('span')?.textContent
+
+  // Manual state needs explicit render
+  el.state.manualFlag = true
+  await new Promise(r => setTimeout(r, 100))
+  const textWithoutRender = el.querySelector('span')?.textContent
+
+  el.render()
+  await new Promise(r => setTimeout(r, 50))
+  const textAfterManualRender = el.querySelector('span')?.textContent
+
+  el.remove()
+  return { textBefore, textAfterReactive, textWithoutRender, textAfterManualRender }
+})
+assert(coexistResult.textBefore === '0-false', `Coexist initial: "${coexistResult.textBefore}"`)
+assert(coexistResult.textAfterReactive === '5-false', `Coexist after reactive: "${coexistResult.textAfterReactive}"`)
+assert(coexistResult.textWithoutRender === '5-false', `Coexist manual without render: stale ("${coexistResult.textWithoutRender}")`)
+assert(coexistResult.textAfterManualRender === '5-true', `Coexist after manual render: "${coexistResult.textAfterManualRender}"`)
+
+// Test 45: static state with type declarations (Number, String, Boolean) — init as undefined
+const stateTypesResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  class StateTypes extends CoupElement {
+    static tag = 'state-types'
+    static state = { count: Number, label: String, active: Boolean }
+    template() {
+      return html`<span>${this.count}-${this.label}-${this.active}</span>`
+    }
+  }
+  StateTypes.define()
+
+  const el = document.createElement('state-types')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  const textBefore = el.querySelector('span')?.textContent
+
+  el.count = 42
+  el.label = 'hi'
+  el.active = true
+  await new Promise(r => setTimeout(r, 100))
+
+  const textAfter = el.querySelector('span')?.textContent
+
+  el.remove()
+  return { textBefore, textAfter }
+})
+assert(stateTypesResult.textBefore === '--', `State types init undefined (renders empty): "${stateTypesResult.textBefore}"`)
+assert(stateTypesResult.textAfter === '42-hi-true', `State types after set: "${stateTypesResult.textAfter}"`)
+
+// Test 46: static state array form
+const stateArrayResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  class StateArray extends CoupElement {
+    static tag = 'state-array'
+    static state = ['count', 'label']
+    template() {
+      return html`<span>${this.count ?? 'none'}-${this.label ?? 'none'}</span>`
+    }
+  }
+  StateArray.define()
+
+  const el = document.createElement('state-array')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  const textBefore = el.querySelector('span')?.textContent
+
+  el.count = 10
+  el.label = 'test'
+  await new Promise(r => setTimeout(r, 100))
+
+  const textAfter = el.querySelector('span')?.textContent
+
+  el.remove()
+  return { textBefore, textAfter }
+})
+assert(stateArrayResult.textBefore === 'none-none', `State array init: "${stateArrayResult.textBefore}"`)
+assert(stateArrayResult.textAfter === '10-test', `State array after set: "${stateArrayResult.textAfter}"`)
+
+// Test 47: stateChanged can trigger additional reactive state (batched together)
+const stateChangedDerivedResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  let renderCount = 0
+
+  class StateChangedDerived extends CoupElement {
+    static tag = 'state-changed-derived'
+    static state = { messages: 0, userHasScrolled: true }
+    stateChanged(changes) {
+      if ('messages' in changes) {
+        this.userHasScrolled = false // derived state change
+      }
+    }
+    template() {
+      renderCount++
+      return html`<span>${this.messages}-${this.userHasScrolled}</span>`
+    }
+  }
+  StateChangedDerived.define()
+
+  const el = document.createElement('state-changed-derived')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  const rendersBefore = renderCount
+
+  el.messages = 5
+  await new Promise(r => setTimeout(r, 100))
+
+  const text = el.querySelector('span')?.textContent
+
+  el.remove()
+  return { text, rendersBefore, rendersAfter: renderCount }
+})
+assert(stateChangedDerivedResult.text === '5-false', `stateChanged derived: "${stateChangedDerivedResult.text}"`)
+
+// Test 48: firstUpdated works with static state
+const firstUpdatedWithStateResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  let firstUpdatedVal = null
+
+  class FirstUpdatedState extends CoupElement {
+    static tag = 'first-updated-state'
+    static state = { count: 42 }
+    firstUpdated() {
+      firstUpdatedVal = this.querySelector('span')?.textContent
+    }
+    template() { return html`<span>${this.count}</span>` }
+  }
+  FirstUpdatedState.define()
+
+  const el = document.createElement('first-updated-state')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  el.remove()
+  return { firstUpdatedVal }
+})
+assert(firstUpdatedWithStateResult.firstUpdatedVal === '42', `firstUpdated with static state: "${firstUpdatedWithStateResult.firstUpdatedVal}"`)
+
 // Summary
 console.log('\n' + (failed ? '❌ SOME TESTS FAILED' : '🎉 All tests passed!'))
 

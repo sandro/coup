@@ -72,6 +72,7 @@ export class CoupElement extends HTMLElement {
   constructor() {
     super()
     this._setupProps()
+    this._setupState()
   }
 
   // --- Debug: state mutation tracking ---
@@ -212,6 +213,66 @@ export class CoupElement extends HTMLElement {
     }
   }
 
+  // --- State: auto-generated getters/setters with auto-render ---
+
+  _setupState() {
+    const state = this.constructor.state
+    if (!state) return
+
+    // Support object and array forms:
+    //   static state = { count: 0, label: 'ready' }        — defaults
+    //   static state = { count: Number, label: String }     — types (init undefined)
+    //   static state = ['count', 'label']                   — all undefined
+    const entries = Array.isArray(state)
+      ? state.map(name => [name, undefined])
+      : Object.entries(state)
+
+    const isType = v => v === String || v === Number || v === Boolean
+      || v === Object || v === Array
+
+    this._state_vals = {}
+
+    for (const [name, typeOrDefault] of entries) {
+      // Collision check: can't be both a prop and state
+      if (this._props.hasOwnProperty(name)) {
+        throw new Error(
+          `${this.constructor.name}: "${name}" declared in both static props and static state`
+        )
+      }
+
+      this._state_vals[name] = isType(typeOrDefault) ? undefined : typeOrDefault
+
+      Object.defineProperty(this, name, {
+        get() {
+          return this._state_vals[name]
+        },
+        set(val) {
+          const old = this._state_vals[name]
+          if (old !== val) {
+            this._state_vals[name] = val
+            this._scheduleRender()
+            // Batch state changes — fire stateChanged once per microtask
+            if (this._connected && this.stateChanged !== CoupElement.prototype.stateChanged) {
+              if (!this._stateChanges) this._stateChanges = {}
+              this._stateChanges[name] = { old, new: val }
+              if (!this._stateChangePending) {
+                this._stateChangePending = true
+                queueMicrotask(() => {
+                  const changes = this._stateChanges
+                  this._stateChanges = null
+                  this._stateChangePending = false
+                  this.stateChanged(changes)
+                })
+              }
+            }
+          }
+        },
+        enumerable: true,
+        configurable: true,
+      })
+    }
+  }
+
   // --- Microtask-batched rendering ---
 
   _scheduleRender() {
@@ -340,6 +401,10 @@ export class CoupElement extends HTMLElement {
   /** Called after every render (DOM is up to date). Override for post-render work like
    *  measuring elements, initializing third-party widgets, or scrolling. */
   updated() {}
+
+  /** Called when static state properties change. Receives { name: { old, new } }.
+   *  Changes are batched — fires once per microtask with all accumulated changes. */
+  stateChanged(_changes) {}
 
   // --- Subscriptions ---
   //
