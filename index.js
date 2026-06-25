@@ -244,8 +244,14 @@ export class CoupElement extends HTMLElement {
     } finally {
       this._rendering = false
     }
-    // Post-render hook — only fires on successful render
-    if (ok) this.updated()
+    // Post-render hooks — only fire on successful render
+    if (ok) {
+      if (!this._firstUpdated) {
+        this._firstUpdated = true
+        this.firstUpdated()
+      }
+      this.updated()
+    }
   }
 
   // --- Public API ---
@@ -326,6 +332,10 @@ export class CoupElement extends HTMLElement {
 
   /** Called when the element is removed from the DOM. Override freely — no super needed. */
   disconnected() {}
+
+  /** Called once after the first render. DOM is populated. Override for one-time
+   *  setup that needs DOM access (binding scroll listeners, initializing widgets, focusing). */
+  firstUpdated() {}
 
   /** Called after every render (DOM is up to date). Override for post-render work like
    *  measuring elements, initializing third-party widgets, or scrolling. */

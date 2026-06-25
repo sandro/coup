@@ -946,6 +946,110 @@ assert(asyncBatchResult.text === 'd', `Async batch: final DOM shows "d" (got "${
 assert(asyncBatchResult.rendersTotal === asyncBatchResult.rendersAfterMount + 3,
   `Async batch: 3 renders for 3 updates (${asyncBatchResult.rendersTotal - asyncBatchResult.rendersAfterMount})`)
 
+// =========================================================================
+// firstUpdated() tests
+// =========================================================================
+
+// Test 36: firstUpdated fires once after first render
+const firstUpdatedResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  let firstUpdatedCount = 0
+  let updatedCount = 0
+  let domInFirstUpdated = null
+
+  class FirstUpdatedTest extends CoupElement {
+    static tag = 'first-updated-test'
+    state = { val: 'initial' }
+    firstUpdated() {
+      firstUpdatedCount++
+      domInFirstUpdated = this.querySelector('span')?.textContent
+    }
+    updated() { updatedCount++ }
+    template() { return html`<span>${this.state.val}</span>` }
+  }
+  FirstUpdatedTest.define()
+
+  const el = document.createElement('first-updated-test')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  const firstUpdatedAfterMount = firstUpdatedCount
+  const updatedAfterMount = updatedCount
+
+  // Trigger additional renders
+  el.state.val = 'second'
+  el.render()
+  await new Promise(r => setTimeout(r, 50))
+
+  el.state.val = 'third'
+  el.render()
+  await new Promise(r => setTimeout(r, 50))
+
+  el.remove()
+  return {
+    firstUpdatedAfterMount,
+    firstUpdatedTotal: firstUpdatedCount,
+    updatedTotal: updatedCount,
+    domInFirstUpdated
+  }
+})
+assert(firstUpdatedResult.firstUpdatedAfterMount === 1, 'firstUpdated: fired on first render')
+assert(firstUpdatedResult.firstUpdatedTotal === 1, `firstUpdated: fired exactly once (${firstUpdatedResult.firstUpdatedTotal})`)
+assert(firstUpdatedResult.updatedTotal >= 3, `updated: fired on every render (${firstUpdatedResult.updatedTotal})`)
+assert(firstUpdatedResult.domInFirstUpdated === 'initial', `firstUpdated: DOM was populated ("${firstUpdatedResult.domInFirstUpdated}")`)
+
+// Test 37: firstUpdated does NOT re-fire on reconnection
+const firstUpdatedReconnectResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  let count = 0
+
+  class FirstUpdatedReconnect extends CoupElement {
+    static tag = 'first-updated-reconnect'
+    firstUpdated() { count++ }
+    template() { return html`<span>hi</span>` }
+  }
+  FirstUpdatedReconnect.define()
+
+  const el = document.createElement('first-updated-reconnect')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  el.remove()
+  await new Promise(r => setTimeout(r, 50))
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  el.remove()
+  return { count }
+})
+assert(firstUpdatedReconnectResult.count === 1, `firstUpdated: not re-fired on reconnect (${firstUpdatedReconnectResult.count})`)
+
+// Test 38: firstUpdated fires before updated on first render
+const firstUpdatedOrderResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  const order = []
+
+  class FirstUpdatedOrder extends CoupElement {
+    static tag = 'first-updated-order'
+    firstUpdated() { order.push('firstUpdated') }
+    updated() { order.push('updated') }
+    template() { return html`<span>order</span>` }
+  }
+  FirstUpdatedOrder.define()
+
+  const el = document.createElement('first-updated-order')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 100))
+
+  el.remove()
+  return { order }
+})
+assert(firstUpdatedOrderResult.order[0] === 'firstUpdated', 'firstUpdated fires before updated')
+assert(firstUpdatedOrderResult.order[1] === 'updated', 'updated fires after firstUpdated')
+
 // Summary
 console.log('\n' + (failed ? '❌ SOME TESTS FAILED' : '🎉 All tests passed!'))
 
