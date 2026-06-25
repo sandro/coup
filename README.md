@@ -4,9 +4,9 @@ A coup against the tyranny of the modern frontend.
 
 You don't need a build step. You don't need a virtual DOM. You don't need hooks, signals, effects, memos, reducers, selectors, or a PhD in reactivity theory to put HTML on a screen.
 
-You need a component. You need a template. You need to decide when to render. That's a coup.
+You need a component. You need a template. That's a coup.
 
-**~250 lines of code. One dependency ([lit-html](https://lit.dev/docs/libraries/standalone-templates/), ~3KB gzip). No build step. No CLI. No starter template.**
+**A framework you can read in one sitting. One dependency ([lit-html](https://lit.dev/docs/libraries/standalone-templates/), ~3KB gzip). No build step. No CLI. No starter template.**
 
 > **[Live examples →](https://sandro.github.io/coup/)**
 
@@ -17,8 +17,10 @@ You need a component. You need a template. You need to decide when to render. Th
 │  template()  → returns html`...`     │
 │  render()    → applies template to   │
 │                DOM via lit-html      │
-│  static props → auto-render on set   │
+│  static props  → auto-render on set  │
+│  static state  → reactive internals  │
 │  static events → window listeners    │
+│  static subscribe → store bindings   │
 │  emit()      → dispatch CustomEvent  │
 └──────────────────────────────────────┘
 ```
@@ -46,24 +48,20 @@ import { CoupElement, html } from 'coup'
 
 class MyCounter extends CoupElement {
   static tag = 'my-counter'
-
-  state = { count: 0 }
-
-  increment() {
-    this.state.count++
-    this.render()  // YOU decide when to re-render
-  }
+  static state = { count: 0 }
 
   template() {
     return html`
-      <button @click=${() => this.increment()}>
-        Clicked ${this.state.count} times
+      <button @click=${() => this.count++}>
+        Clicked ${this.count} times
       </button>
     `
   }
 }
 MyCounter.define()
 ```
+
+Set `this.count` and it re-renders. No manual `render()` call needed — but you *can* call it when you want full control. Both paths are always available.
 
 ## API
 
@@ -112,18 +110,18 @@ template() {
 
 ### `render()`
 
-Call `this.render()` to trigger a re-render. This is the manual trigger for internal state changes.
+Call `this.render()` to manually trigger a re-render. With `static state`, rendering is automatic — but `render()` is always there when you need it (e.g., after mutating manual `this.state` objects, or after async operations).
 
 ```js
 onClick() {
   this.state.expanded = !this.state.expanded
-  this.render()
+  this.render()  // manual pattern — still works
 }
 ```
 
 ### `static props`
 
-Declares reactive properties. Auto-generates getters/setters. When a parent sets a prop via lit-html's `.prop=${value}` binding, the component auto-re-renders.
+Declares reactive properties. Auto-generates getters/setters via `Object.defineProperty`. When a parent sets a prop via lit-html's `.prop=${value}` binding, the component auto-re-renders.
 
 ```js
 class UserCard extends CoupElement {
@@ -160,6 +158,61 @@ Object.defineProperty(this, 'user', {
 
 Multiple prop changes in the same microtask coalesce into a single render.
 
+### `static state`
+
+Declares reactive internal state. Same mechanism as `static props` — `Object.defineProperty` getters/setters with `queueMicrotask` batching. No proxies.
+
+```js
+class SearchBox extends CoupElement {
+  static tag = 'search-box'
+  static state = { query: '', results: [], loading: false }
+
+  async search(q) {
+    this.query = q           // auto-renders
+    this.loading = true      // coalesces with above — one render
+    this.results = await fetchResults(q)
+    this.loading = false     // one more render
+  }
+
+  template() {
+    return html`
+      <input @input=${e => this.search(e.target.value)} .value=${this.query}>
+      ${this.loading
+        ? html`<p>Loading...</p>`
+        : html`<ul>${this.results.map(r => html`<li>${r}</li>`)}</ul>`
+      }
+    `
+  }
+}
+```
+
+**Three declaration forms:**
+
+```js
+// Defaults — each key gets its initial value
+static state = { count: 0, label: 'ready' }
+
+// Types — initialized to undefined (like props)
+static state = { count: Number, label: String }
+
+// Array — all undefined
+static state = ['count', 'label']
+```
+
+Access state directly on `this` — it's `this.count`, not `this.state.count`.
+
+**Important:** Object mutation does NOT trigger a re-render. The setter uses strict equality (`!==`), so you must assign a new reference:
+
+```js
+// ❌ Won't re-render — same reference
+this.items.push(newItem)
+
+// ✅ New array — triggers re-render
+this.items = [...this.items, newItem]
+```
+
+**Coexists with manual state.** You can still use `this.state = {}` + `this.render()` in the same project — or even the same component. `static state` is the convenience path; manual render is the power path.
+
 ### `static attrs`
 
 Maps HTML attributes to reactive values via `attributeChangedCallback`. Values are type-coerced.
@@ -172,13 +225,12 @@ class ShowPlaylist extends CoupElement {
   async attributeChangedCallback(name, oldValue, newValue) {
     super.attributeChangedCallback(name, oldValue, newValue)
     if (name === 'id' && newValue) {
-      this.state.playlist = await fetchPlaylist(newValue)
-      this.render()
+      this.playlist = await fetchPlaylist(newValue)
     }
   }
 
   template() {
-    return html`<h2>${this.state.playlist?.name}</h2>`
+    return html`<h2>${this.playlist?.name}</h2>`
   }
 }
 ```
@@ -229,14 +281,14 @@ class PlayerControls extends CoupElement {
     'app:theme-changed': 'onThemeChanged',
   }
 
+  static state = { track: null, theme: 'light' }
+
   onPlayerState(e) {
-    this.state.track = e.detail.track
-    this.render()
+    this.track = e.detail.track
   }
 
   onThemeChanged(e) {
-    this.state.theme = e.detail
-    this.render()
+    this.theme = e.detail
   }
 }
 ```
@@ -252,30 +304,72 @@ this.emit('tasks:remove', { id: 42 })
 // Parent listens:
 class TaskList extends CoupElement {
   static events = { 'tasks:remove': 'onRemove' }
+  static state = { tasks: [] }
 
   onRemove(e) {
-    this.state.tasks = this.state.tasks.filter(t => t.id !== e.detail.id)
-    this.render()
+    this.tasks = this.tasks.filter(t => t.id !== e.detail.id)
   }
 }
 ```
 
-### Lifecycle: `connected()` / `disconnected()`
+### `static subscribe`
 
-Clean hooks for setup/teardown. No need to call `super` — coup handles that internally.
+Auto-subscribe to stores. Listeners are bound on connect, unbound on disconnect — no boilerplate. Works with coup `Store` or anything with a `subscribe(fn) → unsubscribe` contract.
+
+```js
+import { appStore, playerStore } from './stores.js'
+
+class NowPlaying extends CoupElement {
+  static tag = 'now-playing'
+  static subscribe = [appStore, playerStore]
+
+  template() {
+    const { user } = appStore.state
+    const { track, playing } = playerStore.state
+    return html`<span>${user} — ${track} ${playing ? '▶' : '⏸'}</span>`
+  }
+}
+NowPlaying.define()
+```
+
+When a subscribed store calls `set()`, the component auto-re-renders. If you define `storeChanged(store, state)`, auto-render is skipped and you control when to call `this.render()` — useful for async work or selective updates.
+
+**Manual subscribe still works.** If you prefer explicit control:
+
+```js
+connected()    { this._unsub = myStore.subscribe(() => this.render()) }
+disconnected() { this._unsub() }
+```
+
+### Lifecycle
+
+| Hook | When it fires |
+|---|---|
+| `connected()` | Element added to DOM, before first render |
+| `firstUpdated()` | Once, after the first render. DOM is populated. Does not re-fire on reconnection. |
+| `updated()` | After every render (DOM is up to date) |
+| `disconnected()` | Element removed from DOM |
+| `propsChanged(changes)` | After props change. Batched — fires once per microtask with `{ name: { old, new } }` |
+| `stateChanged(changes)` | After static state changes. Batched — fires once per microtask with `{ name: { old, new } }` |
+| `storeChanged(store, state)` | When a subscribed store updates. If defined, auto-render is skipped — you call `this.render()` when ready. |
+
+No need to call `super` — coup handles that internally.
 
 ```js
 class MyTrack extends CoupElement {
   static tag = 'my-track'
 
   connected() {
-    // Called after the element is added to the DOM and first render completes
     this.player = getPlayer()
     this.player.addListener('statechange', this.onStateChange)
   }
 
+  firstUpdated() {
+    // DOM exists now — safe to query, measure, focus
+    this.$('input')?.focus()
+  }
+
   disconnected() {
-    // Called when the element is removed from the DOM — clean up here
     this.player.removeListener('statechange', this.onStateChange)
   }
 }
@@ -289,6 +383,105 @@ Shortcuts for `this.querySelector` and `this.querySelectorAll`:
 this.$('.title')          // → first .title element inside this component
 this.$$('input')          // → all input elements inside this component
 ```
+
+## State Management with `Store`
+
+Coup includes a lightweight `Store` class for shared state. It's 15 lines of code — an observable object with `set()` and `subscribe()`. Use it when multiple components need the same data. **It's entirely optional** — you can use any state management approach you like, or just keep state local to components.
+
+### Creating a store
+
+```js
+import { Store } from 'coup'
+
+export const appStore = new Store({
+  user: null,
+  bookmarks: [],
+  search: '',
+})
+```
+
+### Updating state
+
+```js
+// Object merge (shallow)
+appStore.set({ search: 'lit-html' })
+
+// Updater function — receives current state, returns updates
+appStore.set(s => ({
+  bookmarks: [...s.bookmarks, newBookmark]
+}))
+
+// Both produce a new state object (immutable — never mutates in place)
+```
+
+### Subscribing in a component
+
+Use `static subscribe` for zero-boilerplate binding:
+
+```js
+class BookmarkList extends CoupElement {
+  static tag = 'bookmark-list'
+  static subscribe = [appStore]
+
+  template() {
+    const { bookmarks, search } = appStore.state
+    const filtered = bookmarks.filter(b =>
+      b.title.toLowerCase().includes(search.toLowerCase())
+    )
+    return html`
+      ${repeat(filtered, b => b.id, b => html`
+        <bookmark-card .bookmark=${b}></bookmark-card>
+      `)}
+    `
+  }
+}
+```
+
+### Key concepts
+
+**Components subscribe independently.** Each component decides whether to listen to the store. The toolbar, stats bar, and list in the [bookmarks example](./examples/6-bookmarks/) all subscribe to the same store but re-render independently.
+
+**Derived data is just functions.** Don't store computed values — derive them:
+
+```js
+// ✅ Compute from store state
+function getFilteredBookmarks() {
+  const { bookmarks, search } = appStore.state
+  return bookmarks.filter(b => b.title.includes(search))
+}
+
+// ❌ Don't duplicate derived state in the store
+appStore.set({ filteredBookmarks: ... }) // stale data waiting to happen
+```
+
+**Multiple stores are fine.** Split state by domain:
+
+```js
+export const playerStore = new Store({ track: null, playing: false })
+export const playlistStore = new Store({ playlists: [], active: null })
+```
+
+### When to use what
+
+| Pattern | Use when |
+|---|---|
+| `static state` | State is local to one component and you want auto-rendering |
+| `this.state` + `this.render()` | You want full control over when rendering happens |
+| `static events` + `emit()` | Child needs to notify parent (or any ancestor) |
+| `Store` + `static subscribe` | Multiple unrelated components need the same data |
+
+### Bring your own
+
+`Store` is intentionally minimal — no middleware, no devtools, no selectors. If you want something more, use any state library that has a subscribe pattern. The component side is always the same:
+
+```js
+static subscribe = [yourThing]
+// or manually:
+connected()    { this._unsub = yourThing.subscribe(() => this.render()) }
+disconnected() { this._unsub() }
+```
+
+See [`examples/6-bookmarks/`](./examples/6-bookmarks/) for a full working example with search, tag filtering, add/delete, and pin/unpin — all driven by a single shared store.
 
 ## Template Syntax (lit-html)
 
@@ -345,17 +538,20 @@ import { CoupElement, html, repeat } from 'coup'
 
 class TodoList extends CoupElement {
   static tag = 'todo-list'
+  static state = { items: [] }
 
-  state = { items: [
-    { id: 1, text: 'First' },
-    { id: 2, text: 'Second' },
-  ]}
+  connected() {
+    this.items = [
+      { id: 1, text: 'First' },
+      { id: 2, text: 'Second' },
+    ]
+  }
 
   template() {
     return html`
       <ul>
         ${repeat(
-          this.state.items,
+          this.items,
           item => item.id,       // key function
           item => html`<li>${item.text}</li>`  // template function
         )}
@@ -378,6 +574,115 @@ import { ifDefined } from 'lit-html/directives/if-defined.js'
 ```
 
 See the full list: [lit-html built-in directives](https://lit.dev/docs/templates/directives/).
+
+## Complete Example
+
+A parent/child component pair using props, static state, events, and keyed lists:
+
+```js
+import { CoupElement, html, repeat } from 'coup'
+
+// ── Child: receives data via props, emits events upward ──
+class TaskItem extends CoupElement {
+  static tag = 'task-item'
+  static props = { task: Object }
+
+  toggle() {
+    this.emit('tasks:toggle', { id: this.task.id })
+  }
+
+  removeTask() {
+    this.emit('tasks:remove', { id: this.task.id })
+  }
+
+  template() {
+    const t = this.task
+    if (!t) return html``
+    return html`
+      <div class="task ${t.done ? 'done' : ''}">
+        <input type="checkbox" .checked=${t.done}
+          @change=${() => this.toggle()} />
+        <span>${t.name}</span>
+        <button @click=${() => this.removeTask()}>✕</button>
+      </div>
+    `
+  }
+}
+TaskItem.define()
+
+// ── Parent: owns state, listens for child events ──
+class TaskApp extends CoupElement {
+  static tag = 'task-app'
+  static events = {
+    'tasks:toggle': 'onToggle',
+    'tasks:remove': 'onRemove',
+  }
+  static state = {
+    tasks: [
+      { id: 1, name: 'Read coup source', done: false },
+      { id: 2, name: 'Build a component', done: true },
+    ]
+  }
+
+  onToggle(e) {
+    this.tasks = this.tasks.map(t =>
+      t.id === e.detail.id ? { ...t, done: !t.done } : t
+    )
+  }
+
+  onRemove(e) {
+    this.tasks = this.tasks.filter(t => t.id !== e.detail.id)
+  }
+
+  template() {
+    return html`
+      ${repeat(
+        this.tasks,
+        t => t.id,
+        t => html`<task-item .task=${t}></task-item>`
+      )}
+      <p>${this.tasks.filter(t => t.done).length} done</p>
+    `
+  }
+}
+TaskApp.define()
+```
+
+## Import Maps (Zero-Build Setup)
+
+Coup has no build step. Instead of bundling with Webpack/Vite, you use a browser-native [import map](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script/type/importmap) to tell the browser where to find modules.
+
+**The problem import maps solve:** When your JS says `import { html } from 'lit-html'`, the browser doesn't know where `'lit-html'` lives — it's not a file path. In Node.js, this resolves via `node_modules/`. In the browser, you need to tell it explicitly.
+
+**`<script type="importmap">`** is a special script tag that maps bare module names to URLs:
+
+```html
+<script type="importmap">
+{
+  "imports": {
+    "lit-html": "https://esm.run/lit-html",
+    "lit-html/": "https://esm.run/lit-html/",
+    "coup": "./path/to/coup/index.js"
+  }
+}
+</script>
+
+<!-- Your app code uses ES module imports as usual -->
+<script type="module" src="app.js"></script>
+```
+
+Now when `app.js` does `import { html } from 'lit-html'`, the browser resolves it to `https://esm.run/lit-html`. When `coup/index.js` does `import { render } from 'lit-html'`, same thing.
+
+| Entry | What it maps |
+|---|---|
+| `"lit-html"` | Exact match — `import ... from 'lit-html'` |
+| `"lit-html/"` | Prefix match — `import ... from 'lit-html/directives/repeat.js'` resolves to `https://esm.run/lit-html/directives/repeat.js`. **Required for directives.** |
+| `"coup"` | Your local coup library |
+
+**Rules:**
+- The import map must appear **before** any `<script type="module">` tags
+- Only one import map per page
+- [Supported in all modern browsers](https://caniuse.com/import-maps) (Chrome 89+, Safari 16.4+, Firefox 108+)
 
 ## Gotchas
 
@@ -403,44 +708,32 @@ class TaskItem extends CoupElement {
 }
 ```
 
-### 2. Use new object references for prop changes
+### 2. Object mutation doesn't trigger re-renders
 
-Props use strict equality (`!==`) for change detection. Mutating an object in place won't trigger a re-render because the reference hasn't changed.
+Props and static state both use strict equality (`!==`) for change detection. Mutating an object in place won't trigger a re-render because the reference hasn't changed.
 
 ```js
-// ❌ WRONG — same reference, prop setter skips re-render
-this.state.tasks.forEach(t => { t.done = true })
-this.render()
-// Parent re-renders, repeat() sets .task on children,
-// but children see old === new (same object ref) and skip
+// ❌ WRONG — same reference, setter doesn't fire
+this.items.push(newItem)
 
-// ✅ CORRECT — new references, prop setters fire
-this.state.tasks = this.state.tasks.map(t => ({ ...t, done: true }))
-this.render()
+// ✅ CORRECT — new reference, triggers re-render
+this.items = [...this.items, newItem]
 ```
 
-This also applies when toggling a single item:
+This applies to any nested mutation:
 
 ```js
-// ❌ Mutates in place — child won't see the change
-const task = this.state.tasks.find(t => t.id === id)
+// ❌ Mutates in place — no re-render
+const task = this.tasks.find(t => t.id === id)
 task.done = !task.done
-this.render()
 
-// ✅ Creates new object — child re-renders
-this.state.tasks = this.state.tasks.map(t =>
+// ✅ Creates new objects — re-renders
+this.tasks = this.tasks.map(t =>
   t.id === id ? { ...t, done: !t.done } : t
 )
-this.render()
 ```
 
-**When is mutation OK?** When only the *parent* needs to re-render — e.g., reordering a list. `repeat()` reorders DOM nodes by key. The children's content hasn't changed, so skipping their re-render is correct.
-
-```js
-// ✅ OK — only parent order matters, children unchanged
-this.state.tasks.reverse()
-this.render()
-```
+**When is mutation OK?** With manual state — mutate `this.state.items`, then call `this.render()` yourself. The auto-render system only applies to `static props` and `static state`.
 
 ### 3. Use `connected()` / `disconnected()`, not raw lifecycle hooks
 
@@ -530,223 +823,6 @@ static attrs = { 'playlist-id': String }
 // Access via this._attrs['playlist-id']
 ```
 
-## Import Maps (Zero-Build Setup)
-
-Coup has no build step. Instead of bundling with Webpack/Vite, you use a browser-native [import map](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script/type/importmap) to tell the browser where to find modules.
-
-**The problem import maps solve:** When your JS says `import { html } from 'lit-html'`, the browser doesn't know where `'lit-html'` lives — it's not a file path. In Node.js, this resolves via `node_modules/`. In the browser, you need to tell it explicitly.
-
-**`<script type="importmap">`** is a special script tag that maps bare module names to URLs:
-
-```html
-<script type="importmap">
-{
-  "imports": {
-    "lit-html": "https://esm.run/lit-html",
-    "lit-html/": "https://esm.run/lit-html/",
-    "coup": "./path/to/coup/index.js"
-  }
-}
-</script>
-
-<!-- Your app code uses ES module imports as usual -->
-<script type="module" src="app.js"></script>
-```
-
-Now when `app.js` does `import { html } from 'lit-html'`, the browser resolves it to `https://esm.run/lit-html`. When `coup/index.js` does `import { render } from 'lit-html'`, same thing.
-
-| Entry | What it maps |
-|---|---|
-| `"lit-html"` | Exact match — `import ... from 'lit-html'` |
-| `"lit-html/"` | Prefix match — `import ... from 'lit-html/directives/repeat.js'` resolves to `https://esm.run/lit-html/directives/repeat.js`. **Required for directives.** |
-| `"coup"` | Your local coup library |
-
-**Rules:**
-- The import map must appear **before** any `<script type="module">` tags
-- Only one import map per page
-- [Supported in all modern browsers](https://caniuse.com/import-maps) (Chrome 89+, Safari 16.4+, Firefox 108+)
-
-## Complete Example
-
-A parent/child component pair using props, events, and keyed lists:
-
-```js
-import { CoupElement, html, repeat } from 'coup'
-
-// ── Child: receives data via props, emits events upward ──
-class TaskItem extends CoupElement {
-  static tag = 'task-item'
-  static props = { task: Object }
-
-  toggle() {
-    this.emit('tasks:toggle', { id: this.task.id })
-  }
-
-  removeTask() {
-    this.emit('tasks:remove', { id: this.task.id })
-  }
-
-  template() {
-    const t = this.task
-    if (!t) return html``
-    return html`
-      <div class="task ${t.done ? 'done' : ''}">
-        <input type="checkbox" .checked=${t.done}
-          @change=${() => this.toggle()} />
-        <span>${t.name}</span>
-        <button @click=${() => this.removeTask()}>✕</button>
-      </div>
-    `
-  }
-}
-TaskItem.define()
-
-// ── Parent: owns state, listens for child events ──
-class TaskApp extends CoupElement {
-  static tag = 'task-app'
-  static events = {
-    'tasks:toggle': 'onToggle',
-    'tasks:remove': 'onRemove',
-  }
-
-  state = {
-    tasks: [
-      { id: 1, name: 'Read coup source', done: false },
-      { id: 2, name: 'Build a component', done: true },
-    ]
-  }
-
-  onToggle(e) {
-    this.state.tasks = this.state.tasks.map(t =>
-      t.id === e.detail.id ? { ...t, done: !t.done } : t
-    )
-    this.render()
-  }
-
-  onRemove(e) {
-    this.state.tasks = this.state.tasks.filter(t => t.id !== e.detail.id)
-    this.render()
-  }
-
-  template() {
-    return html`
-      ${repeat(
-        this.state.tasks,
-        t => t.id,
-        t => html`<task-item .task=${t}></task-item>`
-      )}
-      <p>${this.state.tasks.filter(t => t.done).length} done</p>
-    `
-  }
-}
-TaskApp.define()
-```
-
-## State Management with `Store`
-
-Coup includes a lightweight `Store` class for shared state. It's 15 lines of code — an observable object with `set()` and `subscribe()`. Use it when multiple components need the same data. **It's entirely optional** — you can use any state management approach you like, or just keep state local to components.
-
-### Creating a store
-
-```js
-import { Store } from 'coup'
-
-export const appStore = new Store({
-  user: null,
-  bookmarks: [],
-  search: '',
-})
-```
-
-### Updating state
-
-```js
-// Object merge (shallow)
-appStore.set({ search: 'lit-html' })
-
-// Updater function — receives current state, returns updates
-appStore.set(s => ({
-  bookmarks: [...s.bookmarks, newBookmark]
-}))
-
-// Both produce a new state object (immutable — never mutates in place)
-```
-
-### Subscribing in a component
-
-```js
-class BookmarkList extends CoupElement {
-  static tag = 'bookmark-list'
-
-  connected() {
-    // Subscribe to store — re-render when anything changes
-    this._unsub = appStore.subscribe(() => this.render())
-  }
-
-  disconnected() {
-    // Always clean up to prevent memory leaks
-    this._unsub()
-  }
-
-  template() {
-    const { bookmarks, search } = appStore.state
-    const filtered = bookmarks.filter(b =>
-      b.title.toLowerCase().includes(search.toLowerCase())
-    )
-    return html`
-      ${repeat(filtered, b => b.id, b => html`
-        <bookmark-card .bookmark=${b}></bookmark-card>
-      `)}
-    `
-  }
-}
-```
-
-### Key concepts
-
-**Components subscribe independently.** Each component decides whether to listen to the store. The toolbar, stats bar, and list in the [bookmarks example](./examples/6-bookmarks/) all subscribe to the same store but re-render independently.
-
-**Derived data is just functions.** Don't store computed values — derive them:
-
-```js
-// ✅ Compute from store state
-function getFilteredBookmarks() {
-  const { bookmarks, search } = appStore.state
-  return bookmarks.filter(b => b.title.includes(search))
-}
-
-// ❌ Don't duplicate derived state in the store
-appStore.set({ filteredBookmarks: ... }) // stale data waiting to happen
-```
-
-**Multiple stores are fine.** Split state by domain:
-
-```js
-export const playerStore = new Store({ track: null, playing: false })
-export const playlistStore = new Store({ playlists: [], active: null })
-```
-
-**You still control the render loop.** The store notifies subscribers synchronously when `set()` is called. Each subscriber decides what to do — typically `this.render()`, but you could debounce, batch, or skip based on what changed.
-
-### When to use Store vs local state vs events
-
-| Pattern | Use when |
-|---|---|
-| `this.state` + `this.render()` | State is local to one component |
-| `static events` + `emit()` | Child needs to notify parent (or any ancestor) |
-| `Store` | Multiple unrelated components need the same data |
-
-### Bring your own
-
-`Store` is intentionally minimal — no middleware, no devtools, no selectors. If you want something more, use any state library that has a subscribe pattern. The component side is always the same:
-
-```js
-connected()    { this._unsub = yourThing.subscribe(() => this.render()) }
-disconnected() { this._unsub() }
-```
-
-See [`examples/6-bookmarks/`](./examples/6-bookmarks/) for a full working example with search, tag filtering, add/delete, and pin/unpin — all driven by a single shared store.
-
 ## Examples
 
 ```
@@ -756,8 +832,9 @@ examples/
   3-kanban/     — drag-and-drop columns, CRUD, cross-component events
   4-chat/       — room switching, component destruction, timers
   5-github/     — fetch API, loading/error states, sorting
-  6-bookmarks/  — shared Store, search, tag filtering, derived data
+  6-bookmarks/  — shared Store, static subscribe, search, tag filtering
   7-editor/     — block editor, Tiptap + CodeMirror, bidirectional sync
+  8-chatbot/    — streaming AI chat, tool calls, file attachments
 ```
 
 Run any example: `npx serve . -p 3000` then open `/examples/1-hello/`.
@@ -776,7 +853,8 @@ Runs a headless Playwright test suite covering rendering, adding, removing, reor
 | Decision | Rationale |
 |---|---|
 | **No shadow DOM** | Global CSS just works. No slots, no style encapsulation headaches. |
-| **No auto-render on internal state** | You call `this.render()`. This prevents runaway render loops and makes data flow explicit. |
+| **`static state` auto-renders** | Convenience path — set a value, UI updates. Same `Object.defineProperty` + `queueMicrotask` batching as props. No proxies. |
+| **Manual `this.state` + `render()` still works** | Power path — full control over when rendering happens. Both patterns coexist. |
 | **Auto-render on prop changes** | Props come from a parent — the parent is saying "your inputs changed." |
 | **`template()` vs `render()`** | Separating definition from trigger prevents accidental recursion. |
 | **Global events via `window`** | Simple pub/sub. No event bus library. Auto-cleanup on disconnect. |
