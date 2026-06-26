@@ -218,8 +218,13 @@ class EditorToolbar extends CoupElement {
       }
       if (editor) {
         this._onUpdate = () => {
-          this._refreshActive()
-          this.render()
+          if (this._toolbarPending) return
+          this._toolbarPending = true
+          queueMicrotask(() => {
+            this._toolbarPending = false
+            this._refreshActive()
+            this.render()
+          })
         }
         editor.on('selectionUpdate', this._onUpdate)
         editor.on('update', this._onUpdate)
