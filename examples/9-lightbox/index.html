@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Media Lightbox — Coup Example</title>
+  <title>Media Lightbox — coup example</title>
   <script type="importmap">
   {
     "imports": {
@@ -132,6 +132,12 @@
     .lb-thumb.active { opacity: 1; border-color: white; }
     .lb-thumb:hover { opacity: 0.85; }
     .lb-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+    /* Hide raw children before component renders */
+    media-lightbox > img,
+    media-lightbox > video {
+      display: none;
+    }
 
     /* Single image mode */
     .single-demo media-lightbox .lb-grid {

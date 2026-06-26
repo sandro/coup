@@ -258,6 +258,38 @@ await test('Bookmarks — add route shows form', '/examples/6-bookmarks/index.ht
   assert(list === 0, 'Bookmark list hidden on add route')
 })
 
+// ── Example 8: Chatbot ──
+await test('Chatbot — renders empty state', '/examples/8-chatbot/index.html', async (page) => {
+  const chatbot = await page.locator('coup-chatbot').count()
+  assert(chatbot === 1, 'coup-chatbot not found')
+  const empty = await page.locator('.cb-empty').count()
+  assert(empty === 1, 'empty state message not shown')
+  const textarea = await page.locator('textarea').count()
+  assert(textarea === 1, 'textarea not found')
+})
+
+await test('Chatbot — send message and get echo response', '/examples/8-chatbot/index.html', async (page) => {
+  await page.locator('textarea').fill('hello chatbot')
+  await page.locator('textarea').press('Enter')
+  await page.waitForTimeout(3000) // wait for streaming response
+  const msgs = await page.locator('chatbot-message').count()
+  assert(msgs === 2, `Expected 2 messages (user + assistant), got ${msgs}`)
+  // Empty state should be gone
+  const empty = await page.locator('.cb-empty').count()
+  assert(empty === 0, 'empty state should be hidden after sending')
+})
+
+await test('Chatbot — typing indicator disappears after response', '/examples/8-chatbot/index.html', async (page) => {
+  await page.locator('textarea').fill('test message')
+  await page.locator('textarea').press('Enter')
+  // Typing indicator should appear while streaming
+  await page.waitForTimeout(100)
+  await page.waitForTimeout(3000)
+  // After response completes, typing indicator should be gone
+  const typing = await page.locator('.cb-typing').count()
+  assert(typing === 0, 'typing indicator should disappear after response')
+})
+
 // ── Results ──
 console.log(`\n${passed} passed, ${failed} failed`)
 await browser.close()
