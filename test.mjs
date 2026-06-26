@@ -1692,6 +1692,44 @@ const reservedResult = await page.evaluate(async () => {
 assert(reservedResult.stateWarning === true, 'Debug: warns on reserved state name')
 assert(reservedResult.propWarning === true, 'Debug: warns on reserved prop name')
 
+// Test 56: Debug mode does NOT freeze class instances (e.g. Tiptap Editor)
+const freezeClassResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+  CoupElement.debug = true
+
+  class MyEditor {
+    constructor() { this.isInitialized = false }
+  }
+
+  class EditorHost extends CoupElement {
+    static tag = 'editor-host'
+    static state = { editor: null }
+    template() { return html`<span>ok</span>` }
+  }
+  EditorHost.define()
+
+  const el = document.createElement('editor-host')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  const inst = new MyEditor()
+  el.editor = inst
+  await new Promise(r => setTimeout(r, 50))
+
+  const frozen = Object.isFrozen(el.editor)
+  let canMutate = false
+  try {
+    el.editor.isInitialized = true
+    canMutate = el.editor.isInitialized === true
+  } catch(e) {}
+
+  CoupElement.debug = false
+  el.remove()
+  return { frozen, canMutate }
+})
+assert(freezeClassResult.frozen === false, 'Debug: class instances are NOT frozen')
+assert(freezeClassResult.canMutate === true, 'Debug: class instances remain mutable')
+
 // Summary
 console.log('\n' + (failed ? '❌ SOME TESTS FAILED' : '🎉 All tests passed!'))
 

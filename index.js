@@ -227,7 +227,10 @@ export class CoupElement extends HTMLElement {
         set(val) {
           const old = this._props[name]
           if (!shallowEqual(old, val)) {
-            if (_debug && val !== null && typeof val === 'object') Object.freeze(val)
+            if (_debug && val !== null && typeof val === 'object') {
+              const p = Object.getPrototypeOf(val)
+              if (Array.isArray(val) || p === Object.prototype || p === null) Object.freeze(val)
+            }
             this._props[name] = val
             if (_debug) this._lastPropChange = name
             this._scheduleRender()
@@ -296,7 +299,10 @@ export class CoupElement extends HTMLElement {
         set(val) {
           const old = this._state_vals[name]
           if (!shallowEqual(old, val)) {
-            if (_debug && val !== null && typeof val === 'object') Object.freeze(val)
+            if (_debug && val !== null && typeof val === 'object') {
+              const p = Object.getPrototypeOf(val)
+              if (Array.isArray(val) || p === Object.prototype || p === null) Object.freeze(val)
+            }
             this._state_vals[name] = val
             if (_debug) this._lastStateChange = name
             this._scheduleRender()
