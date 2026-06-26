@@ -1,5 +1,36 @@
 {
+  "name": "coup-js",
+  "version": "0.1.0",
+  "description": "Zero-build web components. 2KB gzipped.",
+  "type": "module",
+  "main": "index.js",
+  "module": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./standalone": "./coup.bundle.js"
+  },
+  "files": [
+    "index.js",
+    "coup.bundle.js",
+    "router.js"
+  ],
+  "scripts": {
+    "bundle": "esbuild bundle-entry.js --bundle --format=esm --minify --outfile=coup.bundle.js",
+    "test": "node test.mjs && node test-examples.mjs"
+  },
+  "keywords": ["web-components", "custom-elements", "lit-html", "zero-build", "framework"],
+  "author": "Sandro Turriate",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sandro/coup"
+  },
+  "homepage": "https://github.com/sandro/coup",
   "devDependencies": {
+    "esbuild": "^0.28.0",
     "playwright": "^1.60.0"
+  },
+  "dependencies": {
+    "lit-html": "^3.3.3"
   }
 }
