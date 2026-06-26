@@ -188,16 +188,16 @@
       <a href="#defining">Defining Components</a>
       <a href="#template">template()</a>
       <a href="#render">render()</a>
+      <a href="#static-state">static state</a>
+      <a href="#state-changed">stateChanged()</a>
       <a href="#props">Props</a>
       <a href="#attrs">Attributes</a>
       <a href="#events">Events</a>
       <a href="#emit">emit()</a>
-      <div class="section-label">State</div>
+      <div class="section-label">Shared State</div>
       <a href="#store">Store</a>
       <a href="#subscribe">static subscribe</a>
       <a href="#store-changed">storeChanged()</a>
-      <a href="#static-state">static state</a>
-      <a href="#state-changed">stateChanged()</a>
       <div class="section-label">Lifecycle</div>
       <a href="#lifecycle">Overview</a>
       <a href="#connected">connected()</a>
@@ -310,8 +310,8 @@ UserCard.<span class="fn">define</span>()</code></pre>
 
       <pre><code>template() {
   <span class="kw">return</span> html<span class="str">`
-    &lt;h2&gt;${this.state.title}&lt;/h2&gt;
-    &lt;p&gt;${this.state.body}&lt;/p&gt;
+    &lt;h2&gt;${this.title}&lt;/h2&gt;
+    &lt;p&gt;${this.body}&lt;/p&gt;
   `</span>
 }</code></pre>
 
@@ -319,9 +319,9 @@ UserCard.<span class="fn">define</span>()</code></pre>
 
       <!-- ================================================================ -->
       <h2 id="render">render()</h2>
-      <p>In most frameworks, the framework decides when to re-render your component — and you spend half your time figuring out why it rendered when it shouldn't have. In coup, you have a choice. Declare <code>static state</code> and coup auto-renders when state changes. Or manage state yourself and call <code>this.render()</code> when you're ready — after an async operation, after a complex multi-step mutation, whenever you want. Both patterns work; pick the one that fits.</p>
+      <p>Most of the time you don't call <code>render()</code> yourself — <code>static state</code> and <code>static props</code> handle it automatically. But <code>this.render()</code> is always there when you need it: after an async operation, after mutating a plain object, or when you want the DOM to update at a precise moment.</p>
 
-      <doc-example label="Toggle — static state (auto-renders)">
+      <doc-example label="Toggle — static state (recommended)">
         <script type="text/plain">
 import { CoupElement, html } from 'coup'
 
@@ -351,8 +351,8 @@ document.body.appendChild(document.createElement('toggle-box'))
         </script>
       </doc-example>
 
-      <h3>Manual state + render()</h3>
-      <p>For full control — async workflows, multi-step mutations, or when you want the DOM to update at a specific moment — use a plain <code>state</code> object and call <code>this.render()</code> explicitly.</p>
+      <h3>Manual alternative</h3>
+      <p>If you need full control over when the DOM updates — async workflows, multi-step mutations, or non-render bookkeeping — use a plain object and call <code>this.render()</code> yourself.</p>
 
       <pre><code><span class="kw">class</span> <span class="fn">ToggleBox</span> <span class="kw">extends</span> CoupElement {
   <span class="kw">static</span> tag = <span class="str">'toggle-box'</span>
@@ -369,302 +369,6 @@ document.body.appendChild(document.createElement('toggle-box'))
     &lt;/button&gt;`</span>
   }
 }</code></pre>
-
-      <!-- ================================================================ -->
-      <h2 id="props">Props</h2>
-      <p>Props are how parent components pass data to children. Declare them with <code>static props</code>, and coup creates getters and setters for you. When a parent changes a prop, the child automatically re-renders — no manual <code>this.render()</code> needed. Props are the one place where coup <em>does</em> auto-render, because the parent is in control.</p>
-
-      <pre><code><span class="kw">class</span> <span class="fn">UserCard</span> <span class="kw">extends</span> CoupElement {
-  <span class="kw">static</span> tag = <span class="str">'user-card'</span>
-  <span class="kw">static</span> props = { name: String, role: String }
-
-  template() {
-    <span class="kw">return</span> html<span class="str">`&lt;div&gt;&lt;strong&gt;${this.name}&lt;/strong&gt; — ${this.role}&lt;/div&gt;`</span>
-  }
-}
-
-<span class="cm">// Parent passes props via lit-html property binding:</span>
-html<span class="str">`&lt;user-card .name=${'Ada'} .role=${'Engineer'}&gt;&lt;/user-card&gt;`</span></code></pre>
-
-      <p>If a parent sets three props at once (which lit-html does when rendering), coup batches them into a single re-render instead of three. And if you set a prop to the same value it already has, nothing happens — no wasted renders.</p>
-
-      <p>Don't need types? Array-style works too: <code>static props = ['name', 'role']</code></p>
-
-      <doc-example label="Props — parent passes data, child auto-renders">
-        <script type="text/plain">
-import { CoupElement, html } from 'coup'
-
-class ColorCard extends CoupElement {
-  static tag = 'color-card'
-  static props = { color: String, label: String }
-
-  template() {
-    return html`
-      <div style="display:inline-block; padding:0.5rem 1rem; margin:0.25rem;
-                  background:${this.color || '#eee'}; border-radius:4px;
-                  color:${this.color === '#333' ? '#fff' : '#333'};">
-        ${this.label || 'no label'}
-      </div>
-    `
-  }
-}
-ColorCard.define()
-
-class ColorPicker extends CoupElement {
-  static tag = 'color-picker'
-  state = {
-    colors: [
-      { color: '#ff6b6b', label: 'Red' },
-      { color: '#51cf66', label: 'Green' },
-      { color: '#339af0', label: 'Blue' },
-      { color: '#333', label: 'Dark' },
-    ]
-  }
-
-  template() {
-    return html`
-      <div>${this.state.colors.map(c =>
-        html`<color-card .color=${c.color} .label=${c.label}></color-card>`
-      )}</div>
-    `
-  }
-}
-ColorPicker.define()
-
-document.body.appendChild(document.createElement('color-picker'))
-        </script>
-      </doc-example>
-
-      <!-- ================================================================ -->
-      <h2 id="attrs">Attributes</h2>
-      <p>Sometimes you want to set values directly in HTML, like <code>&lt;status-badge status="online"&gt;</code>. That's what attributes are for. Declare them with <code>static attrs</code>, and coup will watch for attribute changes and coerce the string value to the right type. If you declare the same name in both <code>static attrs</code> and <code>static props</code>, attribute changes automatically flow through to the prop system (including auto-re-rendering).</p>
-
-      <pre><code><span class="kw">class</span> <span class="fn">StatusBadge</span> <span class="kw">extends</span> CoupElement {
-  <span class="kw">static</span> tag = <span class="str">'status-badge'</span>
-  <span class="kw">static</span> attrs = { status: String }
-  <span class="kw">static</span> props = { status: String }
-
-  template() {
-    <span class="kw">const</span> colors = { online: <span class="str">'#51cf66'</span>, offline: <span class="str">'#aaa'</span>, busy: <span class="str">'#ff6b6b'</span> }
-    <span class="kw">return</span> html<span class="str">`&lt;span style="color: ${colors[this.status]}"&gt;● ${this.status}&lt;/span&gt;`</span>
-  }
-}</code></pre>
-
-      <p>The bridge between HTML attributes (always strings) and JavaScript props (any type) is automatic. Set an attribute in HTML, and the right prop updates with the right type.</p>
-
-      <table>
-        <thead><tr><th>Type</th><th>Coercion</th></tr></thead>
-        <tbody>
-          <tr><td><code>String</code></td><td>Value as-is. <code>null</code> → <code>undefined</code></td></tr>
-          <tr><td><code>Number</code></td><td><code>Number(value)</code>. <code>null</code> → <code>undefined</code></td></tr>
-          <tr><td><code>Boolean</code></td><td><code>true</code> if attribute present, <code>false</code> if removed</td></tr>
-        </tbody>
-      </table>
-
-      <!-- ================================================================ -->
-      <h2 id="events">Events</h2>
-      <p>Need to listen for keyboard shortcuts, custom events from other components, or browser events? Declare them in <code>static events</code> and coup handles the rest — listeners are added when your component connects to the DOM and removed when it disconnects. No manual <code>addEventListener</code>/<code>removeEventListener</code> bookkeeping. No leaked listeners.</p>
-
-      <doc-example label="Events — listen to window events, auto-cleanup on disconnect">
-        <script type="text/plain">
-import { CoupElement, html } from 'coup'
-
-class KeyLogger extends CoupElement {
-  static tag = 'key-logger'
-  static events = { 'keydown': 'onKey' }
-  state = { keys: [] }
-
-  onKey(e) {
-    this.state.keys = [...this.state.keys.slice(-9), e.key]
-    this.render()
-  }
-
-  template() {
-    return html`
-      <div>
-        <p style="font-size:0.85rem; color:#666;">Click here, then press any key:</p>
-        <div style="display:flex; gap:0.3rem; flex-wrap:wrap; margin-top:0.3rem; min-height:2rem;">
-          ${this.state.keys.map(k => html`
-            <kbd style="padding:0.2rem 0.5rem; background:#f4f4f4; border:1px solid #ddd;
-                        border-radius:3px; font-family:monospace; font-size:0.85rem;">${k}</kbd>
-          `)}
-        </div>
-      </div>
-    `
-  }
-}
-KeyLogger.define()
-
-document.body.appendChild(document.createElement('key-logger'))
-        </script>
-      </doc-example>
-
-      <!-- ================================================================ -->
-      <h2 id="emit">emit()</h2>
-      <p>The flip side of <code>static events</code>. When a component needs to tell the world something happened, it calls <code>this.emit()</code>. This fires a <code>CustomEvent</code> on <code>window</code>, and any component with a matching <code>static events</code> entry hears it. No event bus library. No prop drilling callbacks through five layers. Just emit and listen.</p>
-
-      <pre><code><span class="cm">// Child emits:</span>
-this.<span class="fn">emit</span>(<span class="str">'item:selected'</span>, { id: <span class="num">42</span> })
-
-<span class="cm">// Parent listens:</span>
-<span class="kw">static</span> events = { <span class="str">'item:selected'</span>: <span class="str">'onItemSelected'</span> }
-
-<span class="fn">onItemSelected</span>(e) {
-  console.log(e.detail.id) <span class="cm">// 42</span>
-}</code></pre>
-
-      <p>Events flow through <code>window</code>, so any component anywhere in your app can listen — even if they're in completely different parts of the DOM tree. It's pub/sub built into the browser.</p>
-
-      <doc-example label="emit() — child sends events, parent listens">
-        <script type="text/plain">
-import { CoupElement, html } from 'coup'
-
-class ColorButton extends CoupElement {
-  static tag = 'color-button'
-  static props = { color: String }
-
-  template() {
-    return html`
-      <button @click=${() => this.emit('color:picked', this.color)}
-              style="background:${this.color}; color:#fff; border:none;
-                     padding:0.4rem 0.8rem; border-radius:4px; cursor:pointer;
-                     margin:0.2rem; font-size:0.85rem;">
-        ${this.color}
-      </button>
-    `
-  }
-}
-ColorButton.define()
-
-class ColorDisplay extends CoupElement {
-  static tag = 'color-display'
-  static events = { 'color:picked': 'onPick' }
-  state = { picked: 'none' }
-
-  onPick(e) {
-    this.state.picked = e.detail
-    this.render()
-  }
-
-  template() {
-    return html`
-      <div style="margin-bottom:0.5rem;">
-        <color-button .color=${'#ff6b6b'}></color-button>
-        <color-button .color=${'#51cf66'}></color-button>
-        <color-button .color=${'#339af0'}></color-button>
-      </div>
-      <p style="font-size:0.9rem;">
-        Picked: <strong style="color:${this.state.picked}">${this.state.picked}</strong>
-      </p>
-    `
-  }
-}
-ColorDisplay.define()
-
-document.body.appendChild(document.createElement('color-display'))
-        </script>
-      </doc-example>
-
-      <!-- ================================================================ -->
-      <h2 id="store">Store</h2>
-      <p>When two or more components need to read and write the same data, put it in a Store. A Store holds your state, notifies subscribers when it changes, and that's it. No reducers, no actions, no selectors, no middleware. Create a store, read <code>.state</code>, call <code>.set()</code> to update it.</p>
-
-      <doc-example label="Store — shared state across components">
-        <script type="text/plain">
-import { CoupElement, Store, html } from 'coup'
-
-const counterStore = new Store({ count: 0 })
-
-class StoreButtons extends CoupElement {
-  static tag = 'store-buttons'
-  static subscribe = [counterStore]
-
-  template() {
-    return html`
-      <div style="display:flex; gap:0.5rem; align-items:center;">
-        <button @click=${() => counterStore.set(s => ({ count: s.count - 1 }))}
-                style="padding:0.3rem 0.7rem; cursor:pointer;">−</button>
-        <strong style="font-size:1.2rem; min-width:2rem; text-align:center;">
-          ${counterStore.state.count}
-        </strong>
-        <button @click=${() => counterStore.set(s => ({ count: s.count + 1 }))}
-                style="padding:0.3rem 0.7rem; cursor:pointer;">+</button>
-      </div>
-    `
-  }
-}
-StoreButtons.define()
-
-class StoreDisplay extends CoupElement {
-  static tag = 'store-display'
-  static subscribe = [counterStore]
-
-  template() {
-    const c = counterStore.state.count
-    const bar = '█'.repeat(Math.abs(c))
-    const color = c >= 0 ? '#51cf66' : '#ff6b6b'
-    return html`
-      <div style="margin-top:0.5rem; font-family:monospace;">
-        <span style="color:${color};">${c >= 0 ? '+' : ''}${c} ${bar}</span>
-      </div>
-    `
-  }
-}
-StoreDisplay.define()
-
-const div = document.createElement('div')
-div.innerHTML = '<store-buttons></store-buttons><store-display></store-display>'
-document.body.appendChild(div)
-        </script>
-      </doc-example>
-
-      <h3>Store API</h3>
-      <pre><code><span class="kw">const</span> store = <span class="kw">new</span> <span class="fn">Store</span>({ count: <span class="num">0</span>, items: [] })
-
-<span class="cm">// Read</span>
-store.state.count  <span class="cm">// 0</span>
-
-<span class="cm">// Update (object — shallow merge)</span>
-store.<span class="fn">set</span>({ count: <span class="num">1</span> })
-
-<span class="cm">// Update (function — derive from current state)</span>
-store.<span class="fn">set</span>(s => ({ count: s.count + <span class="num">1</span> }))
-
-<span class="cm">// Subscribe (returns unsubscribe function)</span>
-<span class="kw">const</span> unsub = store.<span class="fn">subscribe</span>(() => console.log(<span class="str">'changed'</span>))
-unsub()</code></pre>
-
-      <!-- ================================================================ -->
-      <h2 id="subscribe">static subscribe</h2>
-      <p>Connecting a component to a store is one line. Declare <code>static subscribe = [myStore]</code> and coup will automatically re-render your component whenever that store updates. Subscribe to as many stores as you need — each change triggers a re-render so your UI stays in sync.</p>
-
-      <pre><code><span class="kw">class</span> <span class="fn">Dashboard</span> <span class="kw">extends</span> CoupElement {
-  <span class="kw">static</span> tag = <span class="str">'app-dashboard'</span>
-  <span class="kw">static</span> subscribe = [userStore, settingsStore]
-
-  template() {
-    <span class="kw">return</span> html<span class="str">`&lt;p&gt;${userStore.state.name} — ${settingsStore.state.theme}&lt;/p&gt;`</span>
-  }
-}</code></pre>
-
-      <p>When your component disconnects from the DOM, subscriptions are cleaned up automatically — no memory leaks. And this isn't limited to coup's Store. Anything with a <code>subscribe(fn) → unsubscribe</code> contract works: a router, a websocket wrapper, whatever you build.</p>
-
-      <!-- ================================================================ -->
-      <h2 id="store-changed">storeChanged()</h2>
-      <p>Sometimes a store change means you need to do work <em>before</em> rendering — fetch data from an API, read from IndexedDB, run a computation. Define <code>storeChanged(store, newState)</code> and coup hands you full control. It won't auto-render; you call <code>this.render()</code> when your async work is done. This is the async-friendly pattern that makes coup great for real apps.</p>
-
-      <pre><code><span class="kw">async</span> <span class="fn">storeChanged</span>(store, newState) {
-  <span class="cm">// Do async work — fetch, IndexedDB, whatever</span>
-  <span class="kw">const</span> data = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">`/api/${newState.id}`</span>)
-  this.state.detail = <span class="kw">await</span> data.<span class="fn">json</span>()
-  this.<span class="fn">render</span>()  <span class="cm">// render when ready, not before</span>
-}</code></pre>
-
-      <p>The rule is simple:</p>
-      <ul>
-        <li><strong>No <code>storeChanged</code> defined?</strong> Coup auto-renders when the store changes. Zero effort.</li>
-        <li><strong><code>storeChanged</code> defined?</strong> You're in charge. Do your async work, call <code>this.render()</code> when the data is ready. Coup stays out of your way.</li>
-      </ul>
 
       <!-- ================================================================ -->
       <h2 id="static-state">static state</h2>
@@ -784,6 +488,323 @@ document.body.appendChild(document.createElement('click-counter'))
 }</code></pre>
 
       <!-- ================================================================ -->
+      <h2 id="props">Props</h2>
+      <p>Props are how parent components pass data to children. Declare them with <code>static props</code>, and coup creates getters and setters for you. When a prop changes, the child re-renders automatically.</p>
+
+      <pre><code><span class="kw">class</span> <span class="fn">UserCard</span> <span class="kw">extends</span> CoupElement {
+  <span class="kw">static</span> tag = <span class="str">'user-card'</span>
+  <span class="kw">static</span> props = { name: String, role: String }
+
+  template() {
+    <span class="kw">return</span> html<span class="str">`&lt;div&gt;&lt;strong&gt;${this.name}&lt;/strong&gt; — ${this.role}&lt;/div&gt;`</span>
+  }
+}
+
+<span class="cm">// Parent passes props via lit-html property binding:</span>
+html<span class="str">`&lt;user-card .name=${'Ada'} .role=${'Engineer'}&gt;&lt;/user-card&gt;`</span></code></pre>
+
+      <p>If a parent sets three props at once (which lit-html does when rendering), coup batches them into a single re-render instead of three. And if you set a prop to the same value it already has, nothing happens — no wasted renders.</p>
+
+      <p>Don't need types? Array-style works too: <code>static props = ['name', 'role']</code></p>
+
+      <doc-example label="Props — parent passes data, child auto-renders">
+        <script type="text/plain">
+import { CoupElement, html } from 'coup'
+
+class ColorCard extends CoupElement {
+  static tag = 'color-card'
+  static props = { color: String, label: String }
+
+  template() {
+    return html`
+      <div style="display:inline-block; padding:0.5rem 1rem; margin:0.25rem;
+                  background:${this.color || '#eee'}; border-radius:4px;
+                  color:${this.color === '#333' ? '#fff' : '#333'};">
+        ${this.label || 'no label'}
+      </div>
+    `
+  }
+}
+ColorCard.define()
+
+class ColorPicker extends CoupElement {
+  static tag = 'color-picker'
+  colors = [
+    { color: '#ff6b6b', label: 'Red' },
+    { color: '#51cf66', label: 'Green' },
+    { color: '#339af0', label: 'Blue' },
+    { color: '#333', label: 'Dark' },
+  ]
+
+  template() {
+    return html`
+      <div>${this.colors.map(c =>
+        html`<color-card .color=${c.color} .label=${c.label}></color-card>`
+      )}</div>
+    `
+  }
+}
+ColorPicker.define()
+
+document.body.appendChild(document.createElement('color-picker'))
+        </script>
+      </doc-example>
+
+      <!-- ================================================================ -->
+      <h2 id="attrs">Attributes</h2>
+      <p><strong>Props = JavaScript data from parent components (objects, arrays, any type). Attrs = HTML attribute strings from markup.</strong> Most of the time you only need props. Use attrs when you want to configure a component directly in HTML.</p>
+
+      <p>Declare them with <code>static attrs</code>, and coup watches for attribute changes and coerces the string value to the right type:</p>
+
+      <pre><code><span class="kw">class</span> <span class="fn">StatusBadge</span> <span class="kw">extends</span> CoupElement {
+  <span class="kw">static</span> tag = <span class="str">'status-badge'</span>
+  <span class="kw">static</span> attrs = { status: String }
+
+  <span class="fn">attributeChangedCallback</span>(name, oldVal, newVal) {
+    <span class="kw">super</span>.<span class="fn">attributeChangedCallback</span>(name, oldVal, newVal)
+    <span class="kw">this</span>.<span class="fn">render</span>()
+  }
+
+  template() {
+    <span class="kw">const</span> colors = { online: <span class="str">'#51cf66'</span>, offline: <span class="str">'#aaa'</span>, busy: <span class="str">'#ff6b6b'</span> }
+    <span class="kw">const</span> status = <span class="kw">this</span>._attrs.status
+    <span class="kw">return</span> html<span class="str">`&lt;span style="color: ${colors[status]}"&gt;● ${status}&lt;/span&gt;`</span>
+  }
+}
+
+<span class="cm">// Now you can write this directly in HTML:</span>
+<span class="cm">// &lt;status-badge status="online"&gt;&lt;/status-badge&gt;</span></code></pre>
+
+      <table>
+        <thead><tr><th>Type</th><th>Coercion</th></tr></thead>
+        <tbody>
+          <tr><td><code>String</code></td><td>Value as-is. <code>null</code> → <code>undefined</code></td></tr>
+          <tr><td><code>Number</code></td><td><code>Number(value)</code>. <code>null</code> → <code>undefined</code></td></tr>
+          <tr><td><code>Boolean</code></td><td><code>true</code> if attribute present, <code>false</code> if removed</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Bridging attrs to props (advanced)</h3>
+      <p>If you declare the same name in both <code>static attrs</code> and <code>static props</code>, attribute changes automatically set the prop — which means auto-re-rendering. This is useful when you want a component that works both from HTML markup <em>and</em> from parent components passing data via JavaScript.</p>
+
+      <pre><code><span class="kw">class</span> <span class="fn">StatusBadge</span> <span class="kw">extends</span> CoupElement {
+  <span class="kw">static</span> tag = <span class="str">'status-badge'</span>
+  <span class="kw">static</span> attrs = { status: String }
+  <span class="kw">static</span> props = { status: String }  <span class="cm">// same name → attrs flow into props</span>
+
+  template() {
+    <span class="kw">const</span> colors = { online: <span class="str">'#51cf66'</span>, offline: <span class="str">'#aaa'</span>, busy: <span class="str">'#ff6b6b'</span> }
+    <span class="kw">return</span> html<span class="str">`&lt;span style="color: ${colors[this.status]}"&gt;● ${this.status}&lt;/span&gt;`</span>
+  }
+}
+
+<span class="cm">// Works from HTML:  &lt;status-badge status="online"&gt;&lt;/status-badge&gt;</span>
+<span class="cm">// Works from JS:    html`&lt;status-badge .status=${'busy'}&gt;&lt;/status-badge&gt;`</span></code></pre>
+
+      <!-- ================================================================ -->
+      <h2 id="events">Events</h2>
+      <p>Need to listen for keyboard shortcuts, custom events from other components, or browser events? Declare them in <code>static events</code> and coup handles the rest — listeners are added when your component connects to the DOM and removed when it disconnects. No manual <code>addEventListener</code>/<code>removeEventListener</code> bookkeeping. No leaked listeners.</p>
+
+      <doc-example label="Events — listen to window events, auto-cleanup on disconnect">
+        <script type="text/plain">
+import { CoupElement, html } from 'coup'
+
+class KeyLogger extends CoupElement {
+  static tag = 'key-logger'
+  static events = { 'keydown': 'onKey' }
+  static state = { keys: [] }
+
+  onKey(e) {
+    this.keys = [...this.keys.slice(-9), e.key]
+  }
+
+  template() {
+    return html`
+      <div>
+        <p style="font-size:0.85rem; color:#666;">Click here, then press any key:</p>
+        <div style="display:flex; gap:0.3rem; flex-wrap:wrap; margin-top:0.3rem; min-height:2rem;">
+          ${this.keys.map(k => html`
+            <kbd style="padding:0.2rem 0.5rem; background:#f4f4f4; border:1px solid #ddd;
+                        border-radius:3px; font-family:monospace; font-size:0.85rem;">${k}</kbd>
+          `)}
+        </div>
+      </div>
+    `
+  }
+}
+KeyLogger.define()
+
+document.body.appendChild(document.createElement('key-logger'))
+        </script>
+      </doc-example>
+
+      <!-- ================================================================ -->
+      <h2 id="emit">emit()</h2>
+      <p>The flip side of <code>static events</code>. When a component needs to tell the world something happened, it calls <code>this.emit()</code>. This fires a <code>CustomEvent</code> on <code>window</code>, and any component with a matching <code>static events</code> entry hears it. No event bus library. No prop drilling callbacks through five layers. Just emit and listen.</p>
+
+      <pre><code><span class="cm">// Child emits:</span>
+this.<span class="fn">emit</span>(<span class="str">'item:selected'</span>, { id: <span class="num">42</span> })
+
+<span class="cm">// Parent listens:</span>
+<span class="kw">static</span> events = { <span class="str">'item:selected'</span>: <span class="str">'onItemSelected'</span> }
+
+<span class="fn">onItemSelected</span>(e) {
+  console.log(e.detail.id) <span class="cm">// 42</span>
+}</code></pre>
+
+      <p>Events flow through <code>window</code>, so any component anywhere in your app can listen — even if they're in completely different parts of the DOM tree. It's pub/sub built into the browser.</p>
+
+      <doc-example label="emit() — child sends events, parent listens">
+        <script type="text/plain">
+import { CoupElement, html } from 'coup'
+
+class ColorButton extends CoupElement {
+  static tag = 'color-button'
+  static props = { color: String }
+
+  template() {
+    return html`
+      <button @click=${() => this.emit('color:picked', this.color)}
+              style="background:${this.color}; color:#fff; border:none;
+                     padding:0.4rem 0.8rem; border-radius:4px; cursor:pointer;
+                     margin:0.2rem; font-size:0.85rem;">
+        ${this.color}
+      </button>
+    `
+  }
+}
+ColorButton.define()
+
+class ColorDisplay extends CoupElement {
+  static tag = 'color-display'
+  static events = { 'color:picked': 'onPick' }
+  static state = { picked: 'none' }
+
+  onPick(e) {
+    this.picked = e.detail
+  }
+
+  template() {
+    return html`
+      <div style="margin-bottom:0.5rem;">
+        <color-button .color=${'#ff6b6b'}></color-button>
+        <color-button .color=${'#51cf66'}></color-button>
+        <color-button .color=${'#339af0'}></color-button>
+      </div>
+      <p style="font-size:0.9rem;">
+        Picked: <strong style="color:${this.picked}">${this.picked}</strong>
+      </p>
+    `
+  }
+}
+ColorDisplay.define()
+
+document.body.appendChild(document.createElement('color-display'))
+        </script>
+      </doc-example>
+
+      <!-- ================================================================ -->
+      <h2 id="store">Store</h2>
+      <p>When two or more components need to read and write the same data, put it in a Store. A Store holds your state, notifies subscribers when it changes, and that's it. No reducers, no actions, no selectors, no middleware. Create a store, read <code>.state</code>, call <code>.set()</code> to update it.</p>
+
+      <doc-example label="Store — shared state across components">
+        <script type="text/plain">
+import { CoupElement, Store, html } from 'coup'
+
+const counterStore = new Store({ count: 0 })
+
+class StoreButtons extends CoupElement {
+  static tag = 'store-buttons'
+  static subscribe = [counterStore]
+
+  template() {
+    return html`
+      <div style="display:flex; gap:0.5rem; align-items:center;">
+        <button @click=${() => counterStore.set(s => ({ count: s.count - 1 }))}
+                style="padding:0.3rem 0.7rem; cursor:pointer;">−</button>
+        <strong style="font-size:1.2rem; min-width:2rem; text-align:center;">
+          ${counterStore.state.count}
+        </strong>
+        <button @click=${() => counterStore.set(s => ({ count: s.count + 1 }))}
+                style="padding:0.3rem 0.7rem; cursor:pointer;">+</button>
+      </div>
+    `
+  }
+}
+StoreButtons.define()
+
+class StoreDisplay extends CoupElement {
+  static tag = 'store-display'
+  static subscribe = [counterStore]
+
+  template() {
+    const c = counterStore.state.count
+    const bar = '█'.repeat(Math.abs(c))
+    const color = c >= 0 ? '#51cf66' : '#ff6b6b'
+    return html`
+      <div style="margin-top:0.5rem; font-family:monospace;">
+        <span style="color:${color};">${c >= 0 ? '+' : ''}${c} ${bar}</span>
+      </div>
+    `
+  }
+}
+StoreDisplay.define()
+
+const div = document.createElement('div')
+div.innerHTML = '<store-buttons></store-buttons><store-display></store-display>'
+document.body.appendChild(div)
+        </script>
+      </doc-example>
+
+      <h3>Store API</h3>
+      <pre><code><span class="kw">const</span> store = <span class="kw">new</span> <span class="fn">Store</span>({ count: <span class="num">0</span>, items: [] })
+
+<span class="cm">// Read</span>
+store.state.count  <span class="cm">// 0</span>
+
+<span class="cm">// Update (object — shallow merge)</span>
+store.<span class="fn">set</span>({ count: <span class="num">1</span> })
+
+<span class="cm">// Update (function — derive from current state)</span>
+store.<span class="fn">set</span>(s => ({ count: s.count + <span class="num">1</span> }))
+
+<span class="cm">// Subscribe (returns unsubscribe function)</span>
+<span class="kw">const</span> unsub = store.<span class="fn">subscribe</span>(() => console.log(<span class="str">'changed'</span>))
+unsub()</code></pre>
+
+      <!-- ================================================================ -->
+      <h2 id="subscribe">static subscribe</h2>
+      <p>Connecting a component to a store is one line. Declare <code>static subscribe = [myStore]</code> and coup will automatically re-render your component whenever that store updates. Subscribe to as many stores as you need — each change triggers a re-render so your UI stays in sync.</p>
+
+      <pre><code><span class="kw">class</span> <span class="fn">Dashboard</span> <span class="kw">extends</span> CoupElement {
+  <span class="kw">static</span> tag = <span class="str">'app-dashboard'</span>
+  <span class="kw">static</span> subscribe = [userStore, settingsStore]
+
+  template() {
+    <span class="kw">return</span> html<span class="str">`&lt;p&gt;${userStore.state.name} — ${settingsStore.state.theme}&lt;/p&gt;`</span>
+  }
+}</code></pre>
+
+      <p>When your component disconnects from the DOM, subscriptions are cleaned up automatically — no memory leaks. And this isn't limited to coup's Store. Anything with a <code>subscribe(fn) → unsubscribe</code> contract works: a router, a websocket wrapper, whatever you build.</p>
+
+      <!-- ================================================================ -->
+      <h2 id="store-changed">storeChanged()</h2>
+      <p>Sometimes a store change means you need to do work <em>before</em> rendering — fetch data from an API, read from IndexedDB, run a computation. Define <code>storeChanged(store, newState)</code> and coup hands you full control. It won't auto-render; you call <code>this.render()</code> when your async work is done. This is the async-friendly pattern that makes coup great for real apps.</p>
+
+      <pre><code><span class="kw">async</span> <span class="fn">storeChanged</span>(store, newState) {
+  <span class="cm">// Do async work — fetch, IndexedDB, whatever</span>
+  <span class="kw">const</span> data = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">`/api/${newState.id}`</span>)
+  this.state.detail = <span class="kw">await</span> data.<span class="fn">json</span>()
+  this.<span class="fn">render</span>()  <span class="cm">// render when ready, not before</span>
+}</code></pre>
+
+      <p>The rule is simple:</p>
+      <ul>
+        <li><strong>No <code>storeChanged</code> defined?</strong> Coup auto-renders when the store changes. Zero effort.</li>
+        <li><strong><code>storeChanged</code> defined?</strong> You're in charge. Do your async work, call <code>this.render()</code> when the data is ready. Coup stays out of your way.</li>
+      </ul>
+
+      <!-- ================================================================ -->
       <h2 id="lifecycle">Lifecycle</h2>
       <p>A component's life is a straight line, not a flowchart. Seven hooks cover everything from birth to death. Compare that to React's <code>useEffect</code> dependency arrays or Angular's change detection strategies — coup gives you a hook for each moment that matters and nothing else.</p>
 
@@ -815,7 +836,7 @@ document.body.appendChild(document.createElement('click-counter'))
       <h2 id="connected">connected()</h2>
       <p>Your component just appeared in the DOM. This is where you do setup work — fetch data from an API, start an interval timer, initialize a third-party library. It's the equivalent of React's <code>componentDidMount</code> or the "run once on mount" <code>useEffect</code>, except it's just a method with a clear name.</p>
 
-      <doc-example label="connected() + forms — fetch weather for any city">
+      <doc-example label="connected() + forms — fetch weather (manual state for async control)">
         <script type="text/plain">
 import { CoupElement, html } from 'coup'
 
@@ -962,15 +983,14 @@ import { CoupElement, html } from 'coup'
 
 class MiniRouter extends CoupElement {
   static tag = 'mini-router'
-  state = { page: 'home' }
+  static state = { page: 'home' }
 
   go(page) {
-    this.state.page = page
-    this.render()
+    this.page = page
   }
 
   template() {
-    const page = this.state.page
+    const page = this.page
     const pages = ['home', 'about', 'contact']
     return html`
       <nav style="display:flex; gap:1rem; margin-bottom:0.75rem;">
@@ -1099,7 +1119,7 @@ router.<span class="fn">destroy</span>()  <span class="cm">// clean up listeners
 template() {
   <span class="kw">return</span> html<span class="str">`
     &lt;ul&gt;
-      ${repeat(this.state.items, i => i.id, i => html`
+      ${repeat(this.items, i => i.id, i => html`
         &lt;li&gt;${i.name}&lt;/li&gt;
       `)}
     &lt;/ul&gt;
@@ -1149,13 +1169,13 @@ html<span class="str">`&lt;ul&gt;${items.map(i => html`&lt;li&gt;${i}&lt;/li&gt;
 
       <h3>Passing data to child components</h3>
       <pre><code><span class="cm">// ✅ Use .dot for objects, arrays, anything non-string</span>
-html<span class="str">`&lt;user-card .user=${this.state.user}&gt;&lt;/user-card&gt;`</span>
+html<span class="str">`&lt;user-card .user=${this.user}&gt;&lt;/user-card&gt;`</span>
 
 <span class="cm">// ✅ Plain attributes work for strings</span>
 html<span class="str">`&lt;status-badge status="online"&gt;&lt;/status-badge&gt;`</span>
 
 <span class="cm">// ❌ This passes "[object Object]" as a string</span>
-html<span class="str">`&lt;user-card user=${this.state.user}&gt;&lt;/user-card&gt;`</span></code></pre>
+html<span class="str">`&lt;user-card user=${this.user}&gt;&lt;/user-card&gt;`</span></code></pre>
 
       <h3>Event handlers</h3>
       <pre><code><span class="cm">// Arrow wrapper — always works</span>
@@ -1175,7 +1195,7 @@ html<span class="str">`&lt;button @click=${this.save}&gt;Save&lt;/button&gt;`</s
       <pre><code><span class="kw">import</span> { nothing } <span class="kw">from</span> <span class="str">'coup'</span>
 
 <span class="cm">// nothing = zero DOM nodes. Use instead of '' or null to avoid empty text nodes.</span>
-html<span class="str">`${this.state.error ? html`&lt;p class="err"&gt;${this.state.error}&lt;/p&gt;` : nothing}`</span></code></pre>
+html<span class="str">`${this.error ? html`&lt;p class="err"&gt;${this.error}&lt;/p&gt;` : nothing}`</span></code></pre>
 
       <!-- ================================================================ -->
       <h2 id="styling">Styling</h2>
@@ -1540,7 +1560,7 @@ disconnected() {
 
 template() {
   <span class="kw">return</span> html<span class="str">`
-    &lt;div class="fade-in"&gt;${this.state.content}&lt;/div&gt;
+    &lt;div class="fade-in"&gt;${this.content}&lt;/div&gt;
   `</span>
 }</code></pre>
 
@@ -1564,7 +1584,7 @@ updated() {
 template() {
   <span class="kw">return</span> html<span class="str">`
     &lt;ul&gt;
-      ${this.state.items.map(i => html`
+      ${this.items.map(i => html`
         &lt;li class="${i.leaving ? 'slide-out' : ''}"&gt;${i.name}&lt;/li&gt;
       `)}
     &lt;/ul&gt;
@@ -1729,16 +1749,15 @@ import { CoupElement, html } from 'coup'
 
 class CharCounter extends CoupElement {
   static tag = 'char-counter'
-  state = { text: '' }
+  static state = { text: '' }
 
   // Class field arrow — auto-binds 'this', safe to pass directly to @input
   onInput = (e) => {
-    this.state.text = e.target.value
-    this.render()
+    this.text = e.target.value
   }
 
   template() {
-    const remaining = 280 - this.state.text.length
+    const remaining = 280 - this.text.length
     return html`
       <textarea
         rows="3"
@@ -1836,7 +1855,7 @@ document.body.appendChild(document.createElement('char-counter'))
       <h3>Parent → Child: props</h3>
       <p>The parent renders the child with data. When the data changes, the child re-renders automatically.</p>
       <pre><code><span class="cm">// Parent template:</span>
-html<span class="str">`&lt;user-card .name=${this.state.user.name} .role=${this.state.user.role}&gt;&lt;/user-card&gt;`</span></code></pre>
+html<span class="str">`&lt;user-card .name=${this.user.name} .role=${this.user.role}&gt;&lt;/user-card&gt;`</span></code></pre>
 
       <h3>Child → Parent: emit</h3>
       <p>The child fires an event. The parent (or any ancestor) listens via <code>static events</code>.</p>
@@ -1846,8 +1865,7 @@ html<span class="str">`&lt;user-card .name=${this.state.user.name} .role=${this.
 <span class="cm">// Parent:</span>
 <span class="kw">static</span> events = { <span class="str">'item:deleted'</span>: <span class="str">'onItemDeleted'</span> }
 onItemDeleted(e) {
-  <span class="kw">this</span>.state.items = <span class="kw">this</span>.state.items.filter(i => i.id !== e.detail.id)
-  <span class="kw">this</span>.render()
+  <span class="kw">this</span>.items = <span class="kw">this</span>.items.filter(i => i.id !== e.detail.id)
 }</code></pre>
 
       <h3>Any → Any: store</h3>
@@ -1870,10 +1888,10 @@ template() {
       <pre><code><span class="kw">import</span> { repeat } <span class="kw">from</span> <span class="str">'coup'</span>
 
 <span class="cm">// ❌ .map() — items tracked by position</span>
-html<span class="str">`${this.state.items.map(i => html`&lt;todo-item .item=${i}&gt;&lt;/todo-item&gt;`)}`</span>
+html<span class="str">`${this.items.map(i => html`&lt;todo-item .item=${i}&gt;&lt;/todo-item&gt;`)}`</span>
 
 <span class="cm">// ✅ repeat() — items tracked by identity</span>
-html<span class="str">`${repeat(this.state.items, i => i.id, i => html`
+html<span class="str">`${repeat(this.items, i => i.id, i => html`
   &lt;todo-item .item=${i}&gt;&lt;/todo-item&gt;
 `)}`</span></code></pre>
 
@@ -1890,8 +1908,8 @@ html<span class="str">`${repeat(this.state.items, i => i.id, i => html`
       <h3>Show/hide with ternary</h3>
       <pre><code>template() {
   <span class="kw">return</span> html<span class="str">`
-    ${this.state.loggedIn
-      ? html`&lt;p&gt;Welcome, ${this.state.user.name}&lt;/p&gt;`
+    ${this.loggedIn
+      ? html`&lt;p&gt;Welcome, ${this.user.name}&lt;/p&gt;`
       : html`&lt;p&gt;&lt;a href="#/login"&gt;Log in&lt;/a&gt;&lt;/p&gt;`}
   `</span>
 }</code></pre>
@@ -1903,7 +1921,7 @@ html<span class="str">`${repeat(this.state.items, i => i.id, i => html`
 template() {
   <span class="kw">return</span> html<span class="str">`
     &lt;h1&gt;Dashboard&lt;/h1&gt;
-    ${this.state.isAdmin ? html`&lt;admin-panel&gt;&lt;/admin-panel&gt;` : nothing}
+    ${this.isAdmin ? html`&lt;admin-panel&gt;&lt;/admin-panel&gt;` : nothing}
   `</span>
 }</code></pre>
 
@@ -1913,11 +1931,11 @@ template() {
   <span class="kw">const</span> pages = {
     home:     html<span class="str">`&lt;home-page&gt;&lt;/home-page&gt;`</span>,
     settings: html<span class="str">`&lt;settings-page&gt;&lt;/settings-page&gt;`</span>,
-    profile:  html<span class="str">`&lt;profile-page .user=${this.state.user}&gt;&lt;/profile-page&gt;`</span>,
+    profile:  html<span class="str">`&lt;profile-page .user=${this.user}&gt;&lt;/profile-page&gt;`</span>,
   }
   <span class="kw">return</span> html<span class="str">`
     &lt;nav&gt;...&lt;/nav&gt;
-    ${pages[this.state.page] || html`&lt;not-found&gt;&lt;/not-found&gt;`}
+    ${pages[this.page] || html`&lt;not-found&gt;&lt;/not-found&gt;`}
   `</span>
 }</code></pre>
       <p>When you switch pages, the old component disconnects (firing <code>disconnected()</code>) and the new one connects (firing <code>connected()</code>). Cleanup and setup happen automatically.</p>

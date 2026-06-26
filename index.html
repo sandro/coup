@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>coup — you need a component, a template, and a render call. That's a coup.</title>
+  <title>coup — zero-build web components</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -73,6 +73,8 @@
     pre code {
       font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
       color: #e6edf3;
+      padding: 0;
+      background: none;
     }
     code {
       font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
@@ -164,19 +166,14 @@
   <!-- Hero -->
   <div class="hero">
     <h1>coup</h1>
-    <p class="tagline">
-      You need a template.<br>
-      You need a component.<br>
-      You need to decide when to&nbsp;render.
-    </p>
-    <p class="tagline" style="color: #fff; font-weight: 600;">That's a coup.</p>
+    <p class="tagline">A coup against the tyranny of the modern frontend.</p>
   </div>
 
-  <!-- The Crime -->
+  <!-- The crime -->
   <section>
     <h2>The crime</h2>
     <p>
-      Somewhere along the way, building a button that says "clicked 3 times" started requiring
+      Somewhere along the way, adding a little interactivity to a web page started requiring
       a bundler, a transpiler, a framework, a state management library, and 200MB of
       <code>node_modules</code> heavier than the application they exist to serve.
       Build pipelines now take longer to configure than the feature they enable.
@@ -194,123 +191,202 @@
     </p>
   </section>
 
-  <!-- The Lie -->
+  <!-- The scene of the crime -->
   <section>
-    <h2>The lie</h2>
+    <h2>The scene of the crime</h2>
     <p>
-      The central lie of modern frontend is: <strong>"you cannot be trusted with the render loop."</strong>
+      Ask a React developer what happens when they call <code>setState</code>. Not what they
+      <em>think</em> happens — what <em class="bright">actually</em> happens. Which components
+      re-render? In what order? Why did that child re-render when its props didn't change?
     </p>
     <p>
-      React, Vue, Svelte, Angular — they all decide <em class="bright">when</em> to render for you.
-      They call it "declarative." They say it frees you to think about <em>what</em> instead of <em>when</em>.
+      They don't know. <strong>Most of them have never known.</strong> They learned the API,
+      not the machine. And the machine was designed to be invisible — until it breaks,
+      and then you're debugging a 15-frame stack trace through a reconciler you were
+      never meant to understand.
     </p>
     <p>
-      But every performance issue you've ever debugged was a <em class="bright">when</em> problem.
-      <em>Why did this re-render?</em> Why did the whole tree update when one input changed?
-      Then you spend your afternoon wrapping things in <code>memo</code> and <code>useCallback</code>,
-      manually telling the framework <strong>when not to render</strong> — which is just telling it
-      when to render, with extra steps and a dependency array you have to maintain by hand.
+      React's answer is more API. <code>useMemo</code> to stop computing things you shouldn't
+      be computing. <code>useCallback</code> to stabilize references that are only unstable because
+      React tears down and re-creates your function on every render. <code>React.memo</code> to
+      prevent re-renders that only happen because the parent re-rendered for unrelated reasons.
+      <em class="bright">Each "optimization" is a patch for a wound the framework inflicted.</em>
     </p>
     <p>
-      The framework took away your control, then gave you back a worse version of it
-      and called it an optimization API. Time to take it back.
+      And they keep adding. Server Components. <code>use()</code>. The compiler that will
+      finally make <code>useMemo</code> unnecessary — which is an admission that they shipped
+      a broken performance model and asked developers to fix it by hand for eight years.
     </p>
   </section>
 
-  <!-- The Counter-offer -->
+  <!-- What's actually hard -->
+  <section>
+    <h2>What's actually hard</h2>
+    <p>
+      Frontend development is not hard. <em class="bright">React</em> is hard.
+    </p>
+    <p>
+      Components, templates, state, events — these are simple ideas. A component is a class.
+      State is a property. A template is a function that returns markup. An event is a
+      function call. Every developer already understands these concepts. Frameworks took
+      simple concepts and buried them under layers of abstraction until
+      "senior frontend engineer" became a specialization in navigating framework internals
+      rather than building interfaces.
+    </p>
+    <p>
+      The browser has had a native component model since 2020. Custom elements. Observed attributes.
+      Lifecycle callbacks. <strong>The platform caught up years ago.</strong> The industry
+      didn't notice because it was too busy configuring Webpack.
+    </p>
+  </section>
+
+  <!-- The counter-offer -->
   <section>
     <h2>The counter-offer</h2>
-    <p>What if you just… called <code>render()</code> when you were ready?</p>
+    <p>
+      Drop a script tag into any page. Add components where you need them.
+      No rewrite. No migration. No build step.
+    </p>
     <pre><code><span class="keyword">import</span> { CoupElement, html } <span class="keyword">from</span> <span class="string">'coup'</span>
 
-<span class="keyword">class</span> <span class="func">TodoList</span> <span class="keyword">extends</span> CoupElement {
-  <span class="keyword">static</span> tag = <span class="string">'todo-list'</span>
-
-  state = { items: [], text: <span class="string">''</span> }
-
-  <span class="func">addItem</span>() {
-    <span class="keyword">if</span> (!<span class="keyword">this</span>.state.text.trim()) <span class="keyword">return</span>
-    <span class="keyword">this</span>.state.items.push(<span class="keyword">this</span>.state.text)
-    <span class="keyword">this</span>.state.text = <span class="string">''</span>
-    <span class="keyword">this</span>.<span class="func">render</span>()
-  }
+<span class="keyword">class</span> <span class="func">MyCounter</span> <span class="keyword">extends</span> CoupElement {
+  <span class="keyword">static</span> tag = <span class="string">'my-counter'</span>
+  <span class="keyword">static</span> state = { count: <span class="string">0</span> }
 
   <span class="func">template</span>() {
     <span class="keyword">return</span> html<span class="string">`
-      &lt;input
-        .value=</span><span class="punct">${</span><span class="keyword">this</span>.state.text<span class="punct">}</span><span class="string">
-        @input=</span><span class="punct">${</span>e => <span class="keyword">this</span>.state.text = e.target.value<span class="punct">}</span><span class="string">
-      &gt;
-      &lt;button @click=</span><span class="punct">${</span>() => <span class="keyword">this</span>.<span class="func">addItem</span>()<span class="punct">}</span><span class="string">&gt;Add&lt;/button&gt;
-      &lt;ul&gt;
-        </span><span class="punct">${</span><span class="keyword">this</span>.state.items.map(i => html<span class="string">`&lt;li&gt;</span><span class="punct">${</span>i<span class="punct">}</span><span class="string">&lt;/li&gt;`</span>)<span class="punct">}</span><span class="string">
-      &lt;/ul&gt;
+      &lt;button @click=</span><span class="punct">${</span>() => <span class="keyword">this</span>.count++<span class="punct">}</span><span class="string">&gt;
+        Clicked </span><span class="punct">${</span><span class="keyword">this</span>.count<span class="punct">}</span><span class="string"> times
+      &lt;/button&gt;
     `</span>
   }
 }
 
-TodoList.<span class="func">define</span>()</code></pre>
+MyCounter.<span class="func">define</span>()</code></pre>
     <p>
-      No hidden machinery. No dependency arrays. No stale closures. No rules of hooks.
-      You changed state, called <code>render()</code>, lit-html diffed the template,
-      and the DOM updated. You just staged a coup against your own build pipeline.
+      That's a real component. Reactive state, efficient DOM updates, automatic cleanup.
+      It works in a static HTML page, a Rails app, a WordPress theme, a marketing site —
+      anywhere you can put a <code>&lt;script&gt;</code> tag.
+    </p>
+    <p>
+      Need a search box with autocomplete? A form with validation? A live-updating dashboard?
+      Drop in one component. The rest of your page doesn't know or care that coup exists.
+    </p>
+    <p>
+      Need a full app? Keep going. Parent-child props, shared stores, event-driven communication
+      between components — coup scales from a single widget to an
+      <a href="examples/3-kanban/">entire SPA</a>. Same tool, same patterns, no second framework
+      when things get "serious."
     </p>
   </section>
 
-  <!-- What coup is -->
+  <!-- The honest part -->
   <section>
-    <h2>What coup is</h2>
+    <h2>The honest part</h2>
     <p>
-      <strong>~250 lines of code.</strong> That's the entire framework — not just the "core,"
-      not the "runtime," not the part before the plugins load. The whole thing.
-      You can read it in one sitting, understand every line, and never wonder what happens
-      between your state change and the DOM update.
+      Coup auto-renders when you set state. So does Alpine. So does Lit. So does every other framework.
+      That's not a new idea, and we didn't invent anything revolutionary. <strong>That's fine.</strong>
     </p>
     <p>
-      The "build system" is an <code>&lt;script type="importmap"&gt;</code>:
-    </p>
-    <pre><code><span class="tag">&lt;script</span> <span class="string">type="importmap"</span><span class="tag">&gt;</span>
-{
-  <span class="string">"imports"</span>: {
-    <span class="string">"lit-html"</span>: <span class="string">"https://esm.sh/lit-html@3"</span>,
-    <span class="string">"lit-html/"</span>: <span class="string">"https://esm.sh/lit-html@3/"</span>,
-    <span class="string">"coup"</span>: <span class="string">"./index.js"</span>
-  }
-}
-<span class="tag">&lt;/script&gt;</span>
-<span class="tag">&lt;script</span> <span class="string">type="module"</span> <span class="string">src="app.js"</span><span class="tag">&gt;&lt;/script&gt;</span></code></pre>
-    <p>
-      No <code>npm install</code>. No <code>webpack.config.js</code>. No <code>vite.config.ts</code>.
-      No <code>next.config.mjs</code>. Open the HTML file. It works.
+      What coup offers is <em class="bright">a small surface area</em>. Under 500 lines. One file.
+      One dependency (<a href="https://lit.dev/docs/libraries/standalone-templates/">lit-html</a>, ~3KB).
+      No compiler. No virtual DOM. No reconciler. No fiber architecture. No hydration.
+      No server runtime. No CLI. No starter template.
     </p>
     <p>
-      Under the hood, coup uses <strong>custom elements</strong> — the browser's own component system.
-      Shipped in every browser since 2020. Ignored by an industry addicted to compilation.
+      You can read the entire framework during a coffee break. Not skim it — <em class="bright">read it</em>,
+      understand every line, and know exactly what happens between your state change and the
+      DOM update. No hidden machinery. No trust required.
+    </p>
+    <p>
+      The coup is not novelty. The coup is that <strong>you don't need 50,000 lines of framework
+      to build for the web</strong> — whether that's one component on an existing page
+      or an entire application from scratch. The browser has been ready for years.
+      The industry just kept building on top of it instead of using it.
+    </p>
+  </section>
+
+  <!-- What coup actually fights -->
+  <section>
+    <h2>What coup actually fights</h2>
+    <p>
+      <strong>The rewrite.</strong> You don't adopt coup. You drop it in. Add a component to
+      one page, see if you like it, add another. Or build the whole thing from scratch.
+      Either way, coup components are custom elements — the browser already knows what
+      to do with them.
+    </p>
+    <p>
+      <strong>The build step.</strong> Your counter doesn't need Webpack. Your todo list doesn't
+      need Vite. An import map and a script tag — that's the entire "build system." Open the
+      HTML file. It works. Ship it.
+    </p>
+    <p>
+      <strong>The invisible machinery.</strong> No virtual DOM diffing your entire tree. No
+      reconciler deciding which children to re-render. No fiber scheduler slicing your work
+      into chunks you didn't ask for. When you set <code>this.count = 5</code>, a setter fires,
+      a microtask batches the update, and lit-html patches <em>only the expressions that changed</em>.
+      That's it. You could step through it in a debugger in under a minute.
+    </p>
+    <p>
+      <strong>The invented problems.</strong> No stale closures — your methods are methods, <code>this</code>
+      is <code>this</code>. No dependency arrays — lifecycle hooks fire when their names say they fire.
+      No rules of hooks — there are no hooks. State is a property. A handler is a method.
+      An effect is code you write in <code>connected()</code> and clean up in <code>disconnected()</code>.
+    </p>
+    <p>
+      <strong>The expertise tax.</strong> You don't need to be a "React developer" to use coup.
+      You need to know JavaScript and HTML. That's it. The component model is a class.
+      The template is a tagged template literal. The state is an object. If you can write
+      a class with methods, you can build anything coup builds.
+    </p>
+  </section>
+
+  <!-- The trust -->
+  <section>
+    <h2>Components you can trust</h2>
+    <p>
+      When you need a component, you should be able to reach for it without hesitating. Will it
+      over-render? Will it be hard to debug? Will it add overhead? With coup, the answer is
+      always no — and you don't have to take our word for it, because you can <em class="bright">see</em> it.
+    </p>
+    <p>
+      <strong>It won't over-render.</strong> A coup component only re-renders when you change its
+      state or a parent changes its props. No tree reconciliation. No cascading re-renders from an
+      ancestor. No "why did this component re-render?" mystery. One component, one setter, one render.
+    </p>
+    <p>
+      <strong>It won't be hard to debug.</strong> Set a breakpoint in your setter. Step through.
+      You'll see your value change, a microtask queue, lit-html diffing your template expressions,
+      and the DOM update. Five stack frames, not fifty. The entire path from state change to
+      pixel is visible in a debugger without framework-specific tooling.
+    </p>
+    <p>
+      <strong>It won't add overhead.</strong> A coup component is a custom element — the same
+      thing the browser uses for <code>&lt;video&gt;</code> and <code>&lt;input&gt;</code>. No wrapper
+      divs, no synthetic event system, no runtime scheduler. The component <em>is</em> the DOM node.
+      Drop it into any page and the cost is the code you wrote, nothing more.
     </p>
   </section>
 
   <!-- Lifecycle -->
   <section>
     <h2>Lifecycle you can hold in your head</h2>
-    <p>Five hooks. No dependency arrays. No cleanup-return-function guessing games.</p>
+    <p>Seven hooks. No dependency arrays. No cleanup-return-function guessing games.</p>
     <ul class="hooks">
       <li><code>connected()</code> Element added to the DOM. Set up your state, start timers, fetch data.</li>
-      <li><code>propsChanged(changes)</code> One or more props changed. You get an object with <code>{ propName: { old, new } }</code>.</li>
-      <li><code>storeChanged(store, state)</code> A subscribed Store updated. You decide if and when to render.</li>
+      <li><code>firstUpdated()</code> Fires once after the first render. DOM is populated — safe to query, measure, focus.</li>
       <li><code>updated()</code> DOM just re-rendered. Measure elements, init third-party widgets, scroll.</li>
       <li><code>disconnected()</code> Element removed. Clean up whatever you started.</li>
+      <li><code>propsChanged(changes)</code> One or more props changed. You get <code>{ propName: { old, new } }</code>.</li>
+      <li><code>stateChanged(changes)</code> One or more static state values changed. Same format.</li>
+      <li><code>storeChanged(store, state)</code> A subscribed Store updated. You decide if and when to render.</li>
     </ul>
     <p>
       Compare with React's <code>useEffect</code> — a single hook that handles mounting,
       updating, <em>and</em> cleanup, distinguished only by what you put in the dependency array.
       Miss a dependency? Stale closure. Include too many? Infinite loop.
-      The old class component lifecycle had <code>componentDidMount</code>,
-      <code>componentDidUpdate</code>, <code>componentWillUnmount</code>,
-      <code>getDerivedStateFromProps</code>, <code>shouldComponentUpdate</code>,
-      <code>getSnapshotBeforeUpdate</code>… a carousel of methods nobody memorized.
-    </p>
-    <p>
-      Coup's lifecycle is five methods that do what their names say. No surprises.
+      <code>connected</code> runs on mount. <code>disconnected</code> runs on unmount. That's the
+      whole story. No return functions. No gotchas.
     </p>
   </section>
 
@@ -318,7 +394,7 @@ TodoList.<span class="func">define</span>()</code></pre>
   <section>
     <h2>The proof</h2>
     <p>
-      Seven runnable examples. No installs. No builds. Click and read the source.
+      Eight runnable examples. No installs. No builds. Click and read the source.
       Every one is a single HTML file with an importmap and vanilla JavaScript.
     </p>
 
@@ -351,12 +427,20 @@ TodoList.<span class="func">define</span>()</code></pre>
         <div class="name">7. Block Editor</div>
         <div class="desc">Block editor — Tiptap + CodeMirror, bidirectional sync</div>
       </a></li>
+      <li><a href="examples/8-chatbot/">
+        <div class="name">8. AI Chatbot</div>
+        <div class="desc">Streaming AI chat, tool calls, file attachments</div>
+      </a></li>
     </ul>
   </section>
 
   <!-- Get started -->
   <section>
     <h2>Get started</h2>
+    <p>
+      I use coup both ways — drop-in components on existing pages <em>and</em> full single-page apps
+      built entirely with it. Same tool. Same patterns. I hope you will too.
+    </p>
     <p>Every <code>.html</code> file you open without a build step is a small act of rebellion. Start here:</p>
     <pre><code>git clone https://github.com/sandro/coup.git
 <span class="keyword">cd</span> coup
