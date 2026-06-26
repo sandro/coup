@@ -839,6 +839,7 @@ examples/
   9-lightbox/   — media lightbox, gallery + single-image, keyboard nav, video
   10-datatable/ — sortable, filterable, paginated data table (250 countries, embedded data)
   11-crypto/    — infinite scroll with crypto prices (IntersectionObserver, paginated API)
+  12-form/      — signup form with field-level validation, dirty/touched tracking, async submit
 ```
 
 Run any example: `npx serve . -p 3000` then open `/examples/1-hello/`.
