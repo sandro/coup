@@ -271,7 +271,10 @@ export class CoupElement extends HTMLElement {
         )
       }
 
-      this._state_vals[name] = isType(typeOrDefault) ? undefined : typeOrDefault
+      const def = isType(typeOrDefault) ? undefined : typeOrDefault
+      this._state_vals[name] = Array.isArray(def) ? [...def]
+        : (def !== null && typeof def === 'object') ? { ...def }
+        : def
 
       Object.defineProperty(this, name, {
         get() {
