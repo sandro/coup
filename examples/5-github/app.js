@@ -1,4 +1,5 @@
-import { CoupElement, html, nothing, repeat } from 'coup'
+import { CoupElement, html, nothing } from 'coup'
+import { repeat } from 'lit-html/directives/repeat.js'
 
 // ============================================================
 // github-explorer — search for a user, show their repos

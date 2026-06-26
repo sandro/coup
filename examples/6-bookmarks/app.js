@@ -1,4 +1,5 @@
-import { CoupElement, html, Store, repeat } from 'coup'
+import { CoupElement, html, Store } from 'coup'
+import { repeat } from 'lit-html/directives/repeat.js'
 import { Router } from '../../router.js'
 
 // ────────────────────────────────────────────────────

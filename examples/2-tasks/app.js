@@ -1,4 +1,5 @@
-import { CoupElement, html, repeat } from 'coup'
+import { CoupElement, html } from 'coup'
+import { repeat } from 'lit-html/directives/repeat.js'
 
 // ============================================================
 // task-item: receives props from parent, emits events upward

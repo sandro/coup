@@ -278,7 +278,8 @@ document.body.appendChild(document.createElement('my-counter'))
       <h2 id="exports">Exports</h2>
       <p>Everything you need comes from one import. No separate packages, no peer dependencies, no version matrix.</p>
 
-      <pre><code><span class="kw">import</span> { CoupElement, Store, html, svg, nothing, repeat } <span class="kw">from</span> <span class="str">'coup'</span></code></pre>
+      <pre><code><span class="kw">import</span> { CoupElement, Store, html, svg, nothing } <span class="kw">from</span> <span class="str">'coup'</span>
+<span class="kw">import</span> { repeat } <span class="kw">from</span> <span class="str">'lit-html/directives/repeat.js'</span></code></pre>
 
       <table>
         <thead><tr><th>Export</th><th>Source</th><th>What</th></tr></thead>
@@ -1114,7 +1115,7 @@ router.<span class="fn">destroy</span>()  <span class="cm">// clean up listeners
       <h3><code>repeat(items, keyFn, template)</code></h3>
       <p>Re-exported from <a href="https://lit.dev/docs/templates/lists/#the-repeat-directive" target="_blank">lit-html</a>. When you're rendering a list and items can be added, removed, or reordered, use <code>repeat()</code> with a key function. This tells lit-html how to track each item, so it moves DOM nodes instead of recreating them. Essential for drag-and-drop, animations, and any list where order matters.</p>
 
-      <pre><code><span class="kw">import</span> { repeat } <span class="kw">from</span> <span class="str">'coup'</span>
+      <pre><code><span class="kw">import</span> { repeat } <span class="kw">from</span> <span class="str">'lit-html/directives/repeat.js'</span>
 
 template() {
   <span class="kw">return</span> html<span class="str">`
@@ -1885,7 +1886,7 @@ template() {
       <p>When rendering a list with <code>.map()</code>, lit-html updates items by position. That's fine for static lists, but if items can be reordered, added in the middle, or removed, the DOM nodes get recycled in confusing ways — inputs lose focus, animations break, component state gets mixed up.</p>
 
       <p>Use <code>repeat()</code> to tell lit-html how to track each item by identity:</p>
-      <pre><code><span class="kw">import</span> { repeat } <span class="kw">from</span> <span class="str">'coup'</span>
+      <pre><code><span class="kw">import</span> { repeat } <span class="kw">from</span> <span class="str">'lit-html/directives/repeat.js'</span>
 
 <span class="cm">// ❌ .map() — items tracked by position</span>
 html<span class="str">`${this.items.map(i => html`&lt;todo-item .item=${i}&gt;&lt;/todo-item&gt;`)}`</span>

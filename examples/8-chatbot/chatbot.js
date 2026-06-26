@@ -22,7 +22,8 @@
 //   --chatbot-height, --chatbot-max-width, --chatbot-bg, --chatbot-user-bg,
 //   --chatbot-assistant-bg, --chatbot-font-size, --chatbot-radius
 
-import { CoupElement, html, repeat, nothing } from 'coup'
+import { CoupElement, html, nothing } from 'coup'
+import { repeat } from 'lit-html/directives/repeat.js'
 
 // ────────────────────────────────────────────────────
 // chatbot-message: a single message bubble

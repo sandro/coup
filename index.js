@@ -3,9 +3,8 @@
 // Zero build, zero shadow DOM, zero magic renders you didn't ask for
 
 import { render as litRender, html, svg, nothing } from 'lit-html'
-import { repeat } from 'lit-html/directives/repeat.js'
 
-export { html, svg, nothing, repeat }
+export { html, svg, nothing }
 
 // --- Debug mode ---
 // Set CoupElement.debug = true to enable dev warnings.
