@@ -3,6 +3,7 @@
 
 import { CoupElement, html, nothing } from 'coup'
 import { Editor } from '@tiptap/core'
+CoupElement.debug = true
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import Image from '@tiptap/extension-image'

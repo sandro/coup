@@ -1,4 +1,5 @@
 import { CoupElement, html } from 'coup'
+CoupElement.debug = true
 
 class MediaLightbox extends CoupElement {
   static tag = 'media-lightbox'

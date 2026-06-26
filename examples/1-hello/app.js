@@ -1,4 +1,5 @@
 import { CoupElement, html } from 'coup'
+CoupElement.debug = true
 
 // ── Child: receives a name prop from parent, renders a greeting ──
 class HelloGreeting extends CoupElement {

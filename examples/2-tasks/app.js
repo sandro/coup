@@ -1,5 +1,6 @@
 import { CoupElement, html } from 'coup'
 import { repeat } from 'lit-html/directives/repeat.js'
+CoupElement.debug = true
 
 // ============================================================
 // task-item: receives props from parent, emits events upward

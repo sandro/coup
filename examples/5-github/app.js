@@ -1,5 +1,6 @@
 import { CoupElement, html, nothing } from 'coup'
 import { repeat } from 'lit-html/directives/repeat.js'
+CoupElement.debug = true
 
 // ============================================================
 // github-explorer — search for a user, show their repos

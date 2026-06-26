@@ -1,6 +1,7 @@
 import { CoupElement, html } from 'coup'
 import { repeat } from 'lit-html/directives/repeat.js'
 import { Router } from '../../router.js'
+CoupElement.debug = true
 
 // ────────────────────────────────────────────────────
 // Fake data & helpers

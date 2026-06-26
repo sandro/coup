@@ -1,6 +1,7 @@
 import { CoupElement, html, Store } from 'coup'
 import { repeat } from 'lit-html/directives/repeat.js'
 import { Router } from '../../router.js'
+CoupElement.debug = true
 
 // ────────────────────────────────────────────────────
 // Store — single source of truth for bookmarks + view state

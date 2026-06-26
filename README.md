@@ -836,6 +836,7 @@ examples/
   6-bookmarks/  — shared Store, static subscribe, search, tag filtering
   7-editor/     — block editor, Tiptap + CodeMirror, bidirectional sync
   8-chatbot/    — streaming AI chat, tool calls, file attachments
+  9-lightbox/   — media lightbox, gallery + single-image, keyboard nav, video
 ```
 
 Run any example: `npx serve . -p 3000` then open `/examples/1-hello/`.
