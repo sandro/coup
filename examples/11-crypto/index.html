@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>coup — Crypto Prices</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "lit-html": "https://esm.sh/lit-html@3",
+      "lit-html/": "https://esm.sh/lit-html@3/",
+      "coup": "../../index.js"
+    }
+  }
+  </script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, system-ui, sans-serif;
+      background: #0a0a0a; color: #e6edf3; min-height: 100vh;
+    }
+    h1 { text-align: center; padding: 24px 16px 8px; font-size: 22px; letter-spacing: -0.5px; }
+    h1 span { color: #58a6ff; }
+
+    crypto-list { display: block; max-width: 860px; margin: 0 auto; padding: 0 12px 40px; }
+
+    .header-row, .coin-row {
+      display: grid;
+      grid-template-columns: 42px 1fr 130px 100px 120px;
+      align-items: center; gap: 8px; padding: 0 12px;
+    }
+    .header-row {
+      position: sticky; top: 0; z-index: 10;
+      background: #0a0a0a; border-bottom: 1px solid #21262d;
+      padding-top: 12px; padding-bottom: 10px;
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #8b949e;
+    }
+    .header-row span:nth-child(3),
+    .header-row span:nth-child(4),
+    .header-row span:nth-child(5) { text-align: right; }
+
+    .coin-row {
+      padding-top: 12px; padding-bottom: 12px;
+      border-bottom: 1px solid #161b22;
+      transition: background 0.15s;
+    }
+    .coin-row:hover { background: #161b22; }
+
+    .coin-id { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .coin-id img { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; }
+    .coin-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .coin-symbol { color: #8b949e; font-size: 12px; text-transform: uppercase; margin-left: 6px; }
+    .coin-rank { color: #8b949e; font-size: 13px; text-align: center; }
+
+    .coin-price, .coin-change, .coin-mcap { text-align: right; font-size: 14px; font-variant-numeric: tabular-nums; }
+    .coin-change.positive { color: #3fb950; }
+    .coin-change.negative { color: #f85149; }
+
+    .coin-mcap { color: #8b949e; font-size: 13px; }
+
+    .spinner {
+      display: flex; justify-content: center; padding: 24px;
+    }
+    .spinner::after {
+      content: ''; width: 24px; height: 24px;
+      border: 2px solid #30363d; border-top-color: #58a6ff;
+      border-radius: 50%; animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-msg {
+      text-align: center; padding: 16px; margin: 8px 0;
+      background: #3d1f1f; border: 1px solid #f85149; border-radius: 8px;
+      font-size: 14px; color: #f85149;
+    }
+    .end-msg { text-align: center; padding: 20px; color: #484f58; font-size: 13px; }
+
+    /* Mobile: hide market cap, shrink grid */
+    @media (max-width: 600px) {
+      .header-row, .coin-row {
+        grid-template-columns: 32px 1fr 100px 72px;
+      }
+      .coin-mcap, .header-row span:nth-child(5) { display: none; }
+      .coin-name { font-size: 13px; }
+      .coin-price, .coin-change { font-size: 13px; }
+      h1 { font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <h1>📈 <span>Crypto</span> Prices</h1>
+  <crypto-list></crypto-list>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
