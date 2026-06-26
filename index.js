@@ -6,6 +6,41 @@ import { render as litRender, html, svg, nothing } from 'lit-html'
 
 export { html, svg, nothing }
 
+// --- Shallow equality for arrays and plain objects ---
+// Prevents re-renders when a parent passes a new array/object reference
+// that contains the same data (e.g. .filter(), .map() with no changes, { ...same }).
+
+function shallowEqual(a, b) {
+  if (a === b) return true
+  if (a == null || b == null) return false
+  if (typeof a !== 'object' || typeof b !== 'object') return false
+
+  const aIsArray = Array.isArray(a)
+  const bIsArray = Array.isArray(b)
+  if (aIsArray !== bIsArray) return false
+
+  if (aIsArray) {
+    if (a.length !== b.length) return false
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false
+    }
+    return true
+  }
+
+  // Plain objects only — skip class instances, DOM nodes, etc.
+  const aProto = Object.getPrototypeOf(a)
+  if (aProto !== Object.prototype && aProto !== null) return false
+  if (Object.getPrototypeOf(b) !== aProto) return false
+
+  const aKeys = Object.keys(a)
+  const bKeys = Object.keys(b)
+  if (aKeys.length !== bKeys.length) return false
+  for (const key of aKeys) {
+    if (a[key] !== b[key]) return false
+  }
+  return true
+}
+
 // --- Debug mode ---
 // Set CoupElement.debug = true to enable dev warnings.
 // Zero cost when off — all checks are gated behind the flag.
@@ -182,7 +217,7 @@ export class CoupElement extends HTMLElement {
         },
         set(val) {
           const old = this._props[name]
-          if (old !== val) {
+          if (!shallowEqual(old, val)) {
             this._props[name] = val
             if (_debug) this._lastPropChange = name
             this._scheduleRender()
@@ -244,7 +279,7 @@ export class CoupElement extends HTMLElement {
         },
         set(val) {
           const old = this._state_vals[name]
-          if (old !== val) {
+          if (!shallowEqual(old, val)) {
             this._state_vals[name] = val
             if (_debug) this._lastStateChange = name
             this._scheduleRender()

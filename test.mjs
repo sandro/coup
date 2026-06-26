@@ -1424,6 +1424,179 @@ const firstUpdatedWithStateResult = await page.evaluate(async () => {
 })
 assert(firstUpdatedWithStateResult.firstUpdatedVal === '42', `firstUpdated with static state: "${firstUpdatedWithStateResult.firstUpdatedVal}"`)
 
+// =========================================================================
+// Shallow equality tests
+// =========================================================================
+
+// Test 49: Prop set with equivalent array skips render
+const shallowArrayResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  let renderCount = 0
+
+  class ShallowArray extends CoupElement {
+    static tag = 'shallow-array'
+    static props = { items: Array }
+    template() {
+      renderCount++
+      return html`<span>${(this.items || []).join(',')}</span>`
+    }
+  }
+  ShallowArray.define()
+
+  const el = document.createElement('shallow-array')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  const a = { id: 1 }
+  const b = { id: 2 }
+  el.items = [a, b]
+  await new Promise(r => setTimeout(r, 50))
+  const rendersAfterFirst = renderCount
+
+  // Set a new array with the same items — should skip
+  el.items = [a, b]
+  await new Promise(r => setTimeout(r, 50))
+  const rendersAfterSame = renderCount
+
+  // Set a different array — should render
+  el.items = [a]
+  await new Promise(r => setTimeout(r, 50))
+  const rendersAfterDiff = renderCount
+
+  el.remove()
+  return { rendersAfterFirst, rendersAfterSame, rendersAfterDiff }
+})
+assert(shallowArrayResult.rendersAfterSame === shallowArrayResult.rendersAfterFirst,
+  `Shallow array: same items skips render (${shallowArrayResult.rendersAfterSame} === ${shallowArrayResult.rendersAfterFirst})`)
+assert(shallowArrayResult.rendersAfterDiff === shallowArrayResult.rendersAfterFirst + 1,
+  `Shallow array: different items triggers render`)
+
+// Test 50: Prop set with equivalent plain object skips render
+const shallowObjResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  let renderCount = 0
+
+  class ShallowObj extends CoupElement {
+    static tag = 'shallow-obj'
+    static props = { data: Object }
+    template() {
+      renderCount++
+      return html`<span>${JSON.stringify(this.data)}</span>`
+    }
+  }
+  ShallowObj.define()
+
+  const el = document.createElement('shallow-obj')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  el.data = { name: 'Ada', age: 30 }
+  await new Promise(r => setTimeout(r, 50))
+  const rendersAfterFirst = renderCount
+
+  // Same shape, same values — should skip
+  el.data = { name: 'Ada', age: 30 }
+  await new Promise(r => setTimeout(r, 50))
+  const rendersAfterSame = renderCount
+
+  // Different value — should render
+  el.data = { name: 'Ada', age: 31 }
+  await new Promise(r => setTimeout(r, 50))
+  const rendersAfterDiff = renderCount
+
+  el.remove()
+  return { rendersAfterFirst, rendersAfterSame, rendersAfterDiff }
+})
+assert(shallowObjResult.rendersAfterSame === shallowObjResult.rendersAfterFirst,
+  `Shallow object: same values skips render (${shallowObjResult.rendersAfterSame} === ${shallowObjResult.rendersAfterFirst})`)
+assert(shallowObjResult.rendersAfterDiff === shallowObjResult.rendersAfterFirst + 1,
+  `Shallow object: different values triggers render`)
+
+// Test 51: Class instances bypass shallow equality (use strict ===)
+const shallowClassResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  let renderCount = 0
+
+  class MyModel {
+    constructor(n) { this.name = n }
+  }
+
+  class ShallowClass extends CoupElement {
+    static tag = 'shallow-class'
+    static props = { model: Object }
+    template() {
+      renderCount++
+      return html`<span>${this.model?.name}</span>`
+    }
+  }
+  ShallowClass.define()
+
+  const el = document.createElement('shallow-class')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  const m1 = new MyModel('Ada')
+  el.model = m1
+  await new Promise(r => setTimeout(r, 50))
+  const rendersAfterFirst = renderCount
+
+  // New instance with same values — class instance, should NOT shallow compare
+  const m2 = new MyModel('Ada')
+  el.model = m2
+  await new Promise(r => setTimeout(r, 50))
+  const rendersAfterNew = renderCount
+
+  el.remove()
+  return { rendersAfterFirst, rendersAfterNew }
+})
+assert(shallowClassResult.rendersAfterNew === shallowClassResult.rendersAfterFirst + 1,
+  `Shallow class: different instances trigger render (not shallow compared)`)
+
+// Test 52: Static state with equivalent array skips render
+const shallowStateResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+
+  let renderCount = 0
+
+  class ShallowState extends CoupElement {
+    static tag = 'shallow-state'
+    static state = { items: [] }
+    template() {
+      renderCount++
+      return html`<span>${this.items.length}</span>`
+    }
+  }
+  ShallowState.define()
+
+  const el = document.createElement('shallow-state')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  el.items = ['a', 'b', 'c']
+  await new Promise(r => setTimeout(r, 50))
+  const rendersAfterSet = renderCount
+
+  // Same contents — should skip
+  el.items = ['a', 'b', 'c']
+  await new Promise(r => setTimeout(r, 50))
+  const rendersAfterSame = renderCount
+
+  // Different — should render
+  el.items = ['a', 'b']
+  await new Promise(r => setTimeout(r, 50))
+  const rendersAfterDiff = renderCount
+
+  el.remove()
+  return { rendersAfterSet, rendersAfterSame, rendersAfterDiff }
+})
+assert(shallowStateResult.rendersAfterSame === shallowStateResult.rendersAfterSet,
+  `Shallow state array: same items skips render`)
+assert(shallowStateResult.rendersAfterDiff === shallowStateResult.rendersAfterSet + 1,
+  `Shallow state array: different items triggers render`)
+
 // Summary
 console.log('\n' + (failed ? '❌ SOME TESTS FAILED' : '🎉 All tests passed!'))
 
