@@ -172,7 +172,7 @@ class BookmarkCard extends CoupElement {
             ${b.pinned ? '⭐' : '☆'}
           </button>
           <a href=${b.url} target="_blank" class="bookmark-title">
-            ${b.pinned ? '⭐ ' : ''}${b.title}
+            ${b.title}
           </a>
           <button class="delete" @click=${() => this.deleteBookmark()}>✕</button>
         </div>
