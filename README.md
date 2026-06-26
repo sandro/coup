@@ -4,8 +4,6 @@ A coup against the tyranny of the modern frontend.
 
 You don't need a build step. You don't need a virtual DOM. You don't need hooks, signals, effects, memos, reducers, selectors, or a PhD in reactivity theory to put HTML on a screen.
 
-You need a component. You need a template. That's a coup.
-
 **A framework you can read in one sitting. One dependency ([lit-html](https://lit.dev/docs/libraries/standalone-templates/), ~3KB gzip). No build step. No CLI. No starter template.**
 
 > **[Live examples →](https://sandro.github.io/coup/)**
@@ -31,8 +29,8 @@ You need a component. You need a template. That's a coup.
 <script type="importmap">
 {
   "imports": {
-    "lit-html": "https://esm.run/lit-html",
-    "lit-html/": "https://esm.run/lit-html/",
+    "lit-html": "https://esm.sh/lit-html@3",
+    "lit-html/": "https://esm.sh/lit-html@3/",
     "coup": "./index.js"
   }
 }
@@ -68,7 +66,8 @@ Set `this.count` and it re-renders. No manual `render()` call needed — but you
 ### Exports
 
 ```js
-import { CoupElement, Store, html, svg, nothing, repeat } from 'coup'
+import { CoupElement, Store, html, svg, nothing } from 'coup'
+import { repeat } from 'lit-html/directives/repeat.js'
 ```
 
 | Export | Source | What |
@@ -534,7 +533,8 @@ html`
 Use `repeat` from lit-html when items can be reordered, added, or removed:
 
 ```js
-import { CoupElement, html, repeat } from 'coup'
+import { CoupElement, html } from 'coup'
+import { repeat } from 'lit-html/directives/repeat.js'
 
 class TodoList extends CoupElement {
   static tag = 'todo-list'
@@ -565,7 +565,7 @@ Without `repeat`, lit-html reuses DOM nodes positionally — if you reorder a li
 
 ### Other lit-html directives
 
-Coup re-exports `html`, `svg`, `nothing`, and `repeat`. For other directives, import directly from lit-html:
+Coup re-exports `html`, `svg`, and `nothing`. For lit-html directives like `repeat`, import directly:
 
 ```js
 import { ref, createRef } from 'lit-html/directives/ref.js'
@@ -580,7 +580,8 @@ See the full list: [lit-html built-in directives](https://lit.dev/docs/templates
 A parent/child component pair using props, static state, events, and keyed lists:
 
 ```js
-import { CoupElement, html, repeat } from 'coup'
+import { CoupElement, html } from 'coup'
+import { repeat } from 'lit-html/directives/repeat.js'
 
 // ── Child: receives data via props, emits events upward ──
 class TaskItem extends CoupElement {
@@ -660,8 +661,8 @@ Coup has no build step. Instead of bundling with Webpack/Vite, you use a browser
 <script type="importmap">
 {
   "imports": {
-    "lit-html": "https://esm.run/lit-html",
-    "lit-html/": "https://esm.run/lit-html/",
+    "lit-html": "https://esm.sh/lit-html@3",
+    "lit-html/": "https://esm.sh/lit-html@3/",
     "coup": "./path/to/coup/index.js"
   }
 }
@@ -671,12 +672,12 @@ Coup has no build step. Instead of bundling with Webpack/Vite, you use a browser
 <script type="module" src="app.js"></script>
 ```
 
-Now when `app.js` does `import { html } from 'lit-html'`, the browser resolves it to `https://esm.run/lit-html`. When `coup/index.js` does `import { render } from 'lit-html'`, same thing.
+Now when `app.js` does `import { html } from 'lit-html'`, the browser resolves it to `https://esm.sh/lit-html@3`. When `coup/index.js` does `import { render } from 'lit-html'`, same thing.
 
 | Entry | What it maps |
 |---|---|
 | `"lit-html"` | Exact match — `import ... from 'lit-html'` |
-| `"lit-html/"` | Prefix match — `import ... from 'lit-html/directives/repeat.js'` resolves to `https://esm.run/lit-html/directives/repeat.js`. **Required for directives.** |
+| `"lit-html/"` | Prefix match — `import ... from 'lit-html/directives/repeat.js'` resolves to `https://esm.sh/lit-html@3/directives/repeat.js`. **Required for directives.** |
 | `"coup"` | Your local coup library |
 
 **Rules:**
@@ -860,3 +861,7 @@ Runs a headless Playwright test suite covering rendering, adding, removing, reor
 | **Global events via `window`** | Simple pub/sub. No event bus library. Auto-cleanup on disconnect. |
 | **lit-html for templating** | Battle-tested, 3KB, efficient diffing, keyed lists via `repeat()`. |
 | **No build step** | Import maps + CDN. Copy `index.js` into your project and go. |
+
+---
+
+One file. 2KB gzipped. Zero build. That's a coup.
