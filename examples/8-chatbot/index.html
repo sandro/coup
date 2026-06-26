@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Chat — coup example</title>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "lit-html": "https://esm.run/lit-html",
+      "lit-html/": "https://esm.run/lit-html/",
+      "coup": "../../index.js"
+    }
+  }
+  </script>
+
+  <style>
+    /* ── CSS Custom Properties ── */
+    /* Override these to restyle the chatbot: */
+    :root {
+      --cb-bg: #ffffff;
+      --cb-text: #1a1a1a;
+      --cb-text-muted: #a3a3a3;
+      --cb-border: #e5e5e5;
+      --cb-user-bg: #f0f0f0;
+      --cb-user-text: #1a1a1a;
+      --cb-assistant-text: #2a2a2a;
+      --cb-input-bg: #fff;
+      --cb-input-border: #d4d4d4;
+      --cb-input-focus: #a3a3a3;
+      --cb-btn-bg: #1a1a1a;
+      --cb-btn-text: #fff;
+      --cb-radius: 0.75rem;
+      --cb-font: system-ui, -apple-system, sans-serif;
+      --cb-font-size: 0.95rem;
+      --cb-max-width: 720px;
+      /* Embedded mode */
+      --cb-widget-width: 380px;
+      --cb-widget-height: 520px;
+    }
+
+    /* ── Dark mode — just variable overrides ── */
+    body.dark {
+      --cb-bg: #0a0a0a;
+      --cb-text: #eee;
+      --cb-text-muted: #666;
+      --cb-border: rgba(255,255,255,0.08);
+      --cb-user-bg: #2a2a2a;
+      --cb-user-text: #eee;
+      --cb-assistant-text: rgba(255,255,255,0.85);
+      --cb-input-bg: #0a0a0a;
+      --cb-input-border: rgba(255,255,255,0.1);
+      --cb-input-focus: rgba(255,255,255,0.2);
+      --cb-btn-bg: #fff;
+      --cb-btn-text: #0a0a0a;
+    }
+    body.dark.embedded { background: #1a1a1a; }
+    body.dark.embedded .page-header { background: #1a1a1a; }
+
+    /* ── Page ── */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: var(--cb-font);
+      background: var(--cb-bg);
+      color: var(--cb-text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    .page-header {
+      padding: 0.75rem 1.5rem;
+      border-bottom: 1px solid var(--cb-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      background: var(--cb-bg);
+    }
+    .page-header a { color: #2563eb; text-decoration: none; font-size: 0.85rem; }
+    .page-header a:hover { text-decoration: underline; }
+    .page-header h1 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--cb-text);
+      letter-spacing: -0.01em;
+    }
+    .mode-toggle {
+      background: none;
+      border: 1px solid var(--cb-border);
+      color: var(--cb-text-muted);
+      font-family: var(--cb-font);
+      font-size: 0.8rem;
+      padding: 0.3rem 0.7rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .mode-toggle:hover {
+      color: var(--cb-text);
+      border-color: var(--cb-input-focus);
+    }
+
+    /* ── Full-page mode ── */
+    coup-chatbot {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      transition: all 0.3s ease;
+    }
+
+    /* ── Embedded mode ── */
+    body.embedded {
+      background: #f5f5f5;
+    }
+    body.embedded .page-header {
+      background: #f5f5f5;
+      border-color: #ddd;
+    }
+    body.embedded coup-chatbot {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      width: var(--cb-widget-width);
+      height: var(--cb-widget-height);
+      flex: none;
+      border-radius: 1rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08);
+      overflow: hidden;
+      border: 1px solid var(--cb-border);
+    }
+
+    /* ── Container ── */
+    .cb-container {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+      background: var(--cb-bg);
+      position: relative;
+    }
+
+    .cb-container.cb-dragover::after {
+      content: 'Drop image here';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(37, 99, 235, 0.04);
+      border: 2px dashed rgba(37, 99, 235, 0.3);
+      color: rgba(37, 99, 235, 0.7);
+      font-size: 1.1rem;
+      font-weight: 500;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    /* ── Messages area ── */
+    .cb-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      scroll-behavior: smooth;
+    }
+    .cb-messages::-webkit-scrollbar { width: 6px; }
+    .cb-messages::-webkit-scrollbar-track { background: transparent; }
+    .cb-messages::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.08);
+      border-radius: 3px;
+    }
+
+    .cb-empty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--cb-text-muted);
+      font-size: var(--cb-font-size);
+      text-align: center;
+      padding: 2rem;
+    }
+
+    /* ── Messages ── */
+    chatbot-message { display: contents; }
+
+    .cb-msg {
+      display: flex;
+      max-width: var(--cb-max-width);
+      width: 100%;
+      margin: 0 auto;
+      padding: 0.5rem 0;
+      animation: cb-fade-in 0.2s ease;
+    }
+    @keyframes cb-fade-in {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .cb-user {
+      justify-content: flex-end;
+    }
+    .cb-assistant {
+      justify-content: flex-start;
+    }
+
+    .cb-bubble {
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-width: 85%;
+      font-size: var(--cb-font-size);
+    }
+
+    .cb-user .cb-bubble {
+      background: var(--cb-user-bg);
+      color: var(--cb-user-text);
+      padding: 0.5rem 0.75rem;
+      border-radius: var(--cb-radius) var(--cb-radius) 0.15rem var(--cb-radius);
+    }
+
+    .cb-assistant .cb-bubble {
+      color: var(--cb-assistant-text);
+      padding: 0.25rem 0;
+    }
+
+    /* ── Avatar ── */
+    .cb-avatar { display: none; }
+
+    /* ── Typing indicator ── */
+    .cb-typing {
+      max-width: var(--cb-max-width);
+      width: 100%;
+      margin: 0 auto;
+      display: flex;
+      gap: 5px;
+      padding: 0.75rem 0;
+    }
+    .cb-typing span {
+      width: 6px;
+      height: 6px;
+      background: rgba(0,0,0,0.15);
+      border-radius: 50%;
+      animation: cb-bounce 1.4s ease-in-out infinite;
+    }
+    .cb-typing span:nth-child(2) { animation-delay: 0.2s; }
+    .cb-typing span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes cb-bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-5px); }
+    }
+
+    /* ── Images in messages ── */
+    .cb-images {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.5rem;
+    }
+    .cb-thumb {
+      max-width: 200px;
+      max-height: 140px;
+      border-radius: 8px;
+      object-fit: cover;
+      cursor: pointer;
+    }
+
+    /* ── Pending files ── */
+    .cb-pending-files {
+      max-width: var(--cb-max-width);
+      width: 100%;
+      margin: 0 auto;
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.5rem 0;
+      overflow-x: auto;
+    }
+    .cb-pending-file {
+      position: relative;
+      flex-shrink: 0;
+    }
+    .cb-pending-file img {
+      width: 56px;
+      height: 56px;
+      border-radius: 8px;
+      object-fit: cover;
+      border: 1px solid var(--cb-border);
+    }
+    .cb-remove-file {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: none;
+      background: #ef4444;
+      color: #fff;
+      font-size: 11px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+
+    /* ── Compose area ── */
+    .cb-compose {
+      max-width: var(--cb-max-width);
+      width: 100%;
+      margin: 0 auto;
+      display: flex;
+      align-items: flex-end;
+      gap: 0.5rem;
+      padding: 1rem;
+    }
+    .cb-compose textarea {
+      flex: 1;
+      border: 1px solid var(--cb-input-border);
+      background: var(--cb-input-bg);
+      color: var(--cb-text);
+      border-radius: 1.25rem;
+      padding: 0.6rem 1rem;
+      font-family: var(--cb-font);
+      font-size: var(--cb-font-size);
+      resize: none;
+      outline: none;
+      max-height: 200px;
+      line-height: 1.5;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .cb-compose textarea:focus {
+      border-color: var(--cb-input-focus);
+    }
+    .cb-compose textarea::placeholder {
+      color: var(--cb-text-muted);
+    }
+    .cb-compose textarea:disabled { opacity: 0.4; }
+
+    /* Attach */
+    .cb-attach {
+      cursor: pointer;
+      color: var(--cb-text-muted);
+      padding: 0.5rem;
+      border-radius: 50%;
+      transition: color 0.15s;
+      display: flex;
+      align-items: center;
+    }
+    .cb-attach:hover { color: var(--cb-text); }
+
+    /* Send */
+    .cb-send {
+      border: none;
+      background: var(--cb-btn-bg);
+      color: var(--cb-btn-text);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      transition: opacity 0.15s;
+      flex-shrink: 0;
+    }
+    .cb-send:hover:not(:disabled) { opacity: 0.8; }
+    .cb-send:disabled { opacity: 0.15; cursor: default; }
+
+    /* Stop */
+    .cb-stop {
+      border: none;
+      background: var(--cb-btn-bg);
+      color: var(--cb-btn-text);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      flex-shrink: 0;
+    }
+    .cb-stop:hover { opacity: 0.8; }
+
+    /* ── Copy action ── */
+    .cb-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.4rem;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .cb-msg:hover .cb-actions { opacity: 1; }
+    .cb-action-btn {
+      background: none;
+      border: 1px solid var(--cb-border);
+      color: var(--cb-text-muted);
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: var(--cb-font);
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .cb-action-btn:hover {
+      color: var(--cb-text);
+      border-color: var(--cb-input-border);
+    }
+
+    /* ── Fullscreen image overlay ── */
+    .cb-img-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      cursor: pointer;
+    }
+    .cb-img-overlay img {
+      max-width: 90vw;
+      max-height: 90vh;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="page-header">
+    <a href="../../">← Back to examples</a>
+    <h1>AI Chat</h1>
+    <div style="display:flex; gap:0.5rem;">
+      <button class="mode-toggle" onclick="document.body.classList.toggle('dark'); this.textContent = document.body.classList.contains('dark') ? '☀ Light' : '☾ Dark'">☾ Dark</button>
+      <button class="mode-toggle" onclick="document.body.classList.toggle('embedded'); this.textContent = document.body.classList.contains('embedded') ? '⛶ Full page' : '◱ Embedded'">◱ Embedded</button>
+    </div>
+  </div>
+
+  <coup-chatbot placeholder="Message…"></coup-chatbot>
+
+  <script type="module">
+    import './chatbot.js'
+
+    // ── Smart mock AI ──
+    // Simulates contextual streaming responses without a real backend.
+    // Replace the endpoint prop with a real API URL to connect to an LLM.
+
+    const responses = {
+      greeting: [
+        "Hey! I'm a demo AI running entirely in your browser — no backend, no API calls. I can answer questions about coup, web components, or just chat. What's on your mind?",
+        "Hello! I'm running locally in this demo — no servers involved. Ask me about coup, web development, or anything else.",
+      ],
+      coup: [
+        "Coup is a zero-build web component framework in under 500 lines. You get reactive state, lifecycle hooks, event delegation, and shared stores — all built on native custom elements and lit-html.\n\nThe key idea: drop a script tag into any page, write a class, and you have a component. No bundler, no compiler, no node_modules.\n\nThis chatbot you're using right now? It's a coup component.",
+        "Great question! Coup gives you:\n\n• `static state` — reactive properties with auto-rendering\n• `static props` — parent-to-child data flow\n• `static events` — declarative event listeners with auto-cleanup\n• `firstUpdated()` — one-time DOM setup after first render\n• `Store` — shared state across components\n\nAll in ~487 lines of JavaScript. No build step required.",
+      ],
+      webcomponents: [
+        "Web components are the browser's native component model — custom elements, shadow DOM, and HTML templates. They've been supported in every major browser since 2020.\n\nThe killer feature: they work everywhere. Drop a custom element into React, Vue, Svelte, WordPress, a static HTML page — it just works. No framework interop layer needed.\n\nCoup builds on custom elements without using shadow DOM, so your components use the page's CSS naturally.",
+      ],
+      react: [
+        "Here's the thing about React: it created a category of problems that only exist because of its architecture.\n\nStale closures? Only happen because hooks re-create functions every render. Dependency arrays? Only needed because useEffect handles mount, update, AND cleanup in one API. useMemo and useCallback? Only exist because React's re-render model makes everything expensive by default.\n\nCoup's approach: your component is a class. `this` is stable. Methods are methods. State is a property. No invented problems.",
+      ],
+      code: [
+        "Here's a complete coup component:\n\n```js\nimport { CoupElement, html } from 'coup'\n\nclass MyWidget extends CoupElement {\n  static tag = 'my-widget'\n  static state = { count: 0 }\n\n  template() {\n    return html`\n      <button @click=${() => this.count++}>\n        Clicked ${this.count} times\n      </button>\n    `\n  }\n}\nMyWidget.define()\n```\n\nThat's it. No imports to configure, no JSX compiler, no useState/useEffect dance. Save it, open the HTML file, it works.",
+      ],
+      help: [
+        "I can help with:\n\n• **coup** — how it works, its API, design philosophy\n• **Web components** — custom elements, lifecycle, best practices\n• **React comparisons** — what's different and why\n• **Code examples** — show me a coup component for any use case\n\nOr just say anything — I'm a demo, but I'll do my best!",
+      ],
+      fallback: [
+        "That's an interesting question! In a real app, this chatbot would stream responses from an LLM. Right now I'm running entirely client-side with canned responses.\n\nTry asking about coup, web components, or React — I have more to say on those topics.",
+        "I'm a demo AI with limited knowledge, but I know a lot about coup! Try asking:\n\n• \"What is coup?\"\n• \"Show me a code example\"\n• \"How is coup different from React?\"\n• \"What are web components?\"",
+        "Good question! I'm just a mock AI in this demo — in production you'd point the `endpoint` prop at a real API and get streaming LLM responses.\n\nI can talk about coup, web components, or React if you're curious.",
+      ],
+    }
+
+    function pickResponse(text) {
+      const lower = text.toLowerCase()
+      if (/^(hi|hello|hey|sup|yo|howdy|greetings)\b/.test(lower)) return pick(responses.greeting)
+      if (/coup/.test(lower)) return pick(responses.coup)
+      if (/web.?component|custom.?element|shadow.?dom/.test(lower)) return pick(responses.webcomponents)
+      if (/react|hooks?|use(state|effect|memo|callback)|jsx|virtual.?dom|vdom/.test(lower)) return pick(responses.react)
+      if (/code|example|show|sample|snippet|demo/.test(lower)) return pick(responses.code)
+      if (/help|what can you|capabilities/.test(lower)) return pick(responses.help)
+      return pick(responses.fallback)
+    }
+
+    function pick(arr) { return arr[Math.floor(Math.random() * arr.length)] }
+
+    // Intercept fetch to simulate a streaming AI endpoint
+    const realFetch = window.fetch
+    window.fetch = async (url, opts) => {
+      if (url !== '/api/chat') return realFetch(url, opts)
+
+      const body = JSON.parse(opts.body)
+      const lastMsg = body.messages[body.messages.length - 1]?.content || ''
+      const response = pickResponse(lastMsg)
+
+      // Stream word-by-word
+      const stream = new ReadableStream({
+        async start(controller) {
+          const encoder = new TextEncoder()
+          // Split on spaces but keep newlines attached
+          const tokens = response.split(/(?<= )|(?<=\n)/)
+          for (const token of tokens) {
+            if (opts.signal?.aborted) break
+            const data = JSON.stringify({ content: token })
+            controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+            await new Promise(r => setTimeout(r, 8 + Math.random() * 12))
+          }
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+          controller.close()
+        }
+      })
+
+      return new Response(stream, {
+        headers: { 'content-type': 'text/event-stream' }
+      })
+    }
+
+    // Point chatbot at the mock endpoint
+    document.querySelector('coup-chatbot').endpoint = '/api/chat'
+  </script>
+</body>
+</html>
