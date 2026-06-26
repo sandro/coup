@@ -838,7 +838,7 @@ examples/
   8-chatbot/    — streaming AI chat, tool calls, file attachments
   9-lightbox/   — media lightbox, gallery + single-image, keyboard nav, video
   10-datatable/ — sortable, filterable, paginated data table (REST Countries API)
-  11-crypto/    — infinite scroll crypto prices (CoinGecko API, IntersectionObserver)
+  11-crypto/    — infinite scroll with crypto prices (IntersectionObserver, paginated API)
 ```
 
 Run any example: `npx serve . -p 3000` then open `/examples/1-hello/`.
