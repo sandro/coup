@@ -87,7 +87,37 @@
       white-space: nowrap;
     }
     td.numeric { text-align: right; font-variant-numeric: tabular-nums; }
-    td.flag { font-size: 20px; text-align: center; width: 40px; }
+    td.low-stock { color: #f85149; }
+
+    /* Product name with thumbnail */
+    td.product-name {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 240px;
+    }
+    td.product-name img {
+      width: 32px;
+      height: 32px;
+      border-radius: 4px;
+      object-fit: cover;
+      flex-shrink: 0;
+      background: #21262d;
+    }
+
+    /* Category badge */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      background: #21262d;
+      border-radius: 12px;
+      font-size: 12px;
+      color: #8b949e;
+      text-transform: capitalize;
+    }
+
+    /* Rating */
+    .rating-num { color: #8b949e; font-size: 12px; margin-left: 4px; }
 
     /* Pagination */
     .pagination {
@@ -135,7 +165,7 @@
   </style>
 </head>
 <body>
-  <h1>🌍 World Countries</h1>
+  <h1>📦 Product Catalog</h1>
   <data-table></data-table>
   <script type="module" src="app.js"></script>
 </body>

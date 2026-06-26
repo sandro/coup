@@ -51,6 +51,49 @@ function warn(tag, msg, ...args) {
   if (_debug) console.warn(`[coup] <${tag}> ${msg}`, ...args)
 }
 
+// --- Debug: error overlay ---
+// Shows template errors visually when debug mode is on.
+// Plain DOM — no lit-html, no coup — so it can't fail the same way.
+
+let _overlay = null
+
+function showErrorOverlay(tag, err) {
+  if (!_overlay) {
+    _overlay = document.createElement('div')
+    _overlay.id = 'coup-error-overlay'
+    _overlay.style.cssText = `
+      position:fixed; inset:0; z-index:99999;
+      background:rgba(0,0,0,0.85); color:#f8f8f8;
+      font-family:'SF Mono',monospace; font-size:13px;
+      padding:2rem; overflow:auto;
+    `
+    const close = document.createElement('button')
+    close.textContent = '× Dismiss'
+    close.style.cssText = `
+      position:fixed; top:1rem; right:1.5rem; z-index:100000;
+      background:none; border:1px solid #666; color:#ccc;
+      font:inherit; padding:0.3rem 0.8rem; border-radius:4px; cursor:pointer;
+    `
+    close.onclick = () => { _overlay.remove(); _overlay = null }
+    _overlay.appendChild(close)
+  }
+  const entry = document.createElement('div')
+  entry.style.cssText = 'margin-top:1.5rem;'
+  entry.innerHTML = `
+    <div style="color:#ff6b6b;font-size:15px;font-weight:600;margin-bottom:0.5rem">
+      &lt;${tag}&gt; template() error
+    </div>
+    <div style="color:#ffa07a;margin-bottom:0.75rem">${esc(err.message)}</div>
+    <pre style="color:#888;white-space:pre-wrap;font-size:12px;line-height:1.5;margin:0">${esc(err.stack || '')}</pre>
+  `
+  _overlay.appendChild(entry)
+  if (!_overlay.parentNode) document.body.appendChild(_overlay)
+}
+
+function esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 const RESERVED = new Set([
   'template', 'render', 'connected', 'disconnected',
   'firstUpdated', 'updated', 'propsChanged', 'stateChanged',
@@ -363,6 +406,7 @@ export class CoupElement extends HTMLElement {
       ok = true
     } catch (err) {
       console.error(`[coup] <${this.constructor.tag}> template() error:`, err)
+      if (_debug) showErrorOverlay(this.constructor.tag, err)
     } finally {
       this._rendering = false
     }
