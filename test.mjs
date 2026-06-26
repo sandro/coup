@@ -1597,6 +1597,101 @@ assert(shallowStateResult.rendersAfterSame === shallowStateResult.rendersAfterSe
 assert(shallowStateResult.rendersAfterDiff === shallowStateResult.rendersAfterSet + 1,
   `Shallow state array: different items triggers render`)
 
+// =========================================================================
+// Debug: Object.freeze + reserved name warnings
+// =========================================================================
+
+// Test 53: Debug mode freezes objects/arrays assigned to static state
+const freezeResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+  CoupElement.debug = true
+
+  class FreezeTest extends CoupElement {
+    static tag = 'freeze-test'
+    static state = { items: [] }
+    template() { return html`<span>${this.items.length}</span>` }
+  }
+  FreezeTest.define()
+
+  const el = document.createElement('freeze-test')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  el.items = ['a', 'b']
+  await new Promise(r => setTimeout(r, 50))
+
+  const frozen = Object.isFrozen(el.items)
+
+  CoupElement.debug = false
+  el.remove()
+  return { frozen }
+})
+assert(freezeResult.frozen === true, 'Debug: Object.freeze freezes static state')
+
+// Test 54: Debug mode freezes objects assigned to props
+const freezePropResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+  CoupElement.debug = true
+
+  class FreezeProp extends CoupElement {
+    static tag = 'freeze-prop'
+    static props = { data: Object }
+    template() { return html`<span>${JSON.stringify(this.data)}</span>` }
+  }
+  FreezeProp.define()
+
+  const el = document.createElement('freeze-prop')
+  document.body.appendChild(el)
+  await new Promise(r => setTimeout(r, 50))
+
+  el.data = { name: 'Ada' }
+  await new Promise(r => setTimeout(r, 50))
+
+  const frozen = Object.isFrozen(el.data)
+
+  CoupElement.debug = false
+  el.remove()
+  return { frozen }
+})
+assert(freezePropResult.frozen === true, 'Debug: Object.freeze freezes props')
+
+// Test 55: Reserved name warning in debug mode
+const reservedResult = await page.evaluate(async () => {
+  const { CoupElement, html } = await import('coup')
+  CoupElement.debug = true
+
+  const warnings = []
+  const origWarn = console.warn
+  console.warn = (...args) => warnings.push(args.join(' '))
+
+  class ReservedState extends CoupElement {
+    static tag = 'reserved-state'
+    static state = { render: 0 }
+    template() { return html`<span>hi</span>` }
+  }
+  ReservedState.define()
+
+  // Constructor fires during createElement, which runs _setupState
+  try { document.createElement('reserved-state') } catch(e) {}
+
+  // Try with props too
+  class ReservedProp extends CoupElement {
+    static tag = 'reserved-prop'
+    static props = { template: String }
+  }
+  ReservedProp.define()
+  try { document.createElement('reserved-prop') } catch(e) {}
+
+  console.warn = origWarn
+  CoupElement.debug = false
+
+  const stateWarning = warnings.some(w => w.includes('state "render" shadows'))
+  const propWarning = warnings.some(w => w.includes('prop "template" shadows'))
+  return { stateWarning, propWarning, warnings }
+})
+assert(reservedResult.stateWarning === true, 'Debug: warns on reserved state name')
+assert(reservedResult.propWarning === true, 'Debug: warns on reserved prop name')
+
 // Summary
 console.log('\n' + (failed ? '❌ SOME TESTS FAILED' : '🎉 All tests passed!'))
 

@@ -51,6 +51,12 @@ function warn(tag, msg, ...args) {
   if (_debug) console.warn(`[coup] <${tag}> ${msg}`, ...args)
 }
 
+const RESERVED = new Set([
+  'template', 'render', 'connected', 'disconnected',
+  'firstUpdated', 'updated', 'propsChanged', 'stateChanged',
+  'storeChanged', 'emit', '$', '$$',
+])
+
 // --- Store: lightweight observable state ---
 
 export class Store {
@@ -209,6 +215,9 @@ export class CoupElement extends HTMLElement {
       : Object.entries(props)
 
     for (const [name, _type] of entries) {
+      if (_debug && RESERVED.has(name)) {
+        warn(this.constructor.tag, `prop "${name}" shadows a CoupElement method — pick a different name`)
+      }
       this._props[name] = undefined
 
       Object.defineProperty(this, name, {
@@ -218,6 +227,7 @@ export class CoupElement extends HTMLElement {
         set(val) {
           const old = this._props[name]
           if (!shallowEqual(old, val)) {
+            if (_debug && val !== null && typeof val === 'object') Object.freeze(val)
             this._props[name] = val
             if (_debug) this._lastPropChange = name
             this._scheduleRender()
@@ -264,6 +274,9 @@ export class CoupElement extends HTMLElement {
     this._state_vals = {}
 
     for (const [name, typeOrDefault] of entries) {
+      if (_debug && RESERVED.has(name)) {
+        warn(this.constructor.tag, `state "${name}" shadows a CoupElement method — pick a different name`)
+      }
       // Collision check: can't be both a prop and state
       if (this._props.hasOwnProperty(name)) {
         throw new Error(
@@ -283,6 +296,7 @@ export class CoupElement extends HTMLElement {
         set(val) {
           const old = this._state_vals[name]
           if (!shallowEqual(old, val)) {
+            if (_debug && val !== null && typeof val === 'object') Object.freeze(val)
             this._state_vals[name] = val
             if (_debug) this._lastStateChange = name
             this._scheduleRender()
