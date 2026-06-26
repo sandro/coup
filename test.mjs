@@ -244,7 +244,9 @@ const debugTplResult = await page.evaluate(async () => {
 })
 assert(debugTplResult.undefinedWarning === true, 'Debug: warns on undefined template return')
 
-// Test 14: Debug mode — warns on same object reference prop set
+// Test 14: Same object reference prop set — silently skips (no render, no warning)
+// When a parent re-renders, lit-html re-assigns the same object to child props.
+// This is normal and should not warn — it's indistinguishable from mutation.
 const debugPropResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
 
@@ -256,7 +258,8 @@ const debugPropResult = await page.evaluate(async () => {
   class PropRef extends CoupElement {
     static tag = 'prop-ref'
     static props = { data: Object }
-    template() { return html`<span>${JSON.stringify(this.data)}</span>` }
+    _renderCount = 0
+    template() { this._renderCount++; return html`<span>${JSON.stringify(this.data)}</span>` }
   }
   PropRef.define()
 
@@ -267,21 +270,23 @@ const debugPropResult = await page.evaluate(async () => {
   const obj = { a: 1 }
   el.data = obj
   await new Promise(r => setTimeout(r, 50))
+  const rendersAfterSet = el._renderCount
 
-  // Set same reference — should warn
+  // Set same reference — should silently skip, no warning
   warnings.length = 0
-  obj.a = 2
   el.data = obj
   await new Promise(r => setTimeout(r, 50))
 
-  const sameRefWarning = warnings.some(w => w.includes('same object reference'))
+  const noWarning = !warnings.some(w => w.includes('same object reference'))
+  const noExtraRender = el._renderCount === rendersAfterSet
 
   console.warn = origWarn
   CoupElement.debug = false
   el.remove()
-  return { sameRefWarning }
+  return { noWarning, noExtraRender }
 })
-assert(debugPropResult.sameRefWarning === true, 'Debug: warns on same object reference prop set')
+assert(debugPropResult.noWarning === true, 'Debug: no warning on same object reference prop set')
+assert(debugPropResult.noExtraRender === true, 'Debug: no extra render on same object reference prop set')
 
 // Test 15: propsChanged fires once with all changes batched
 const propsChangedResult = await page.evaluate(async () => {

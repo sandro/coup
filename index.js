@@ -201,10 +201,6 @@ export class CoupElement extends HTMLElement {
                 })
               }
             }
-          } else if (_debug && val !== null && typeof val === 'object') {
-            warn(this.constructor.tag,
-              `prop "${name}" was set to the same object reference. ` +
-              `If you mutated it, use a new object: { ...old, key: newVal }`)
           }
         },
         enumerable: true,
