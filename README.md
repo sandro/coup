@@ -61,13 +61,47 @@ MyCounter.define()
 
 Set `this.count` and it re-renders. No manual `render()` call needed — but you *can* call it when you want full control. Both paths are always available.
 
+### Standalone bundle (single import, no importmap)
+
+```html
+<my-counter></my-counter>
+<script type="module">
+  import { CoupElement, html } from 'https://esm.sh/coup-js/standalone'
+
+  class MyCounter extends CoupElement {
+    static tag = 'my-counter'
+    static state = { count: 0 }
+
+    template() {
+      return html`
+        <button @click=${() => this.count++}>
+          Clicked ${this.count} times
+        </button>
+      `
+    }
+  }
+  MyCounter.define()
+</script>
+```
+
+One URL. Everything included — lit-html, `repeat`, `classMap`, `styleMap`, `unsafeHTML`, `Router`. **7.8KB gzipped.** No importmap, no coordination, no trailing-slash gotchas.
+
+Use the importmap approach for multi-page sites (shared lit-html cache). Use the standalone bundle for prototypes, single-file apps, and when you want one import line.
+
 ## API
 
 ### Exports
 
 ```js
+// Importmap approach
 import { CoupElement, Store, html, svg, nothing } from 'coup'
 import { repeat } from 'lit-html/directives/repeat.js'
+import { Router } from 'coup/router.js'
+
+// Standalone bundle — everything in one import
+import { CoupElement, Store, html, svg, nothing,
+         repeat, classMap, styleMap, unsafeHTML, Router
+} from 'https://esm.sh/coup-js/standalone'
 ```
 
 | Export | Source | What |
@@ -76,7 +110,11 @@ import { repeat } from 'lit-html/directives/repeat.js'
 | `Store` | coup | Lightweight observable state container |
 | `html`, `svg` | lit-html | Tagged template functions for DOM |
 | `nothing` | lit-html | Render-nothing sentinel |
-| `repeat` | lit-html | Keyed list rendering |
+| `repeat` | lit-html | Keyed list rendering (standalone: included) |
+| `classMap` | lit-html | Conditional CSS classes (standalone only) |
+| `styleMap` | lit-html | Dynamic inline styles (standalone only) |
+| `unsafeHTML` | lit-html | Render raw HTML strings (standalone only) |
+| `Router` | coup/router | Hash-based SPA router (standalone: included) |
 
 ### `CoupElement`
 
