@@ -112,28 +112,31 @@
     .example-header button:hover { background: #2ea043; }
     .example-source {
       position: relative;
+      overflow: auto;
+      max-height: 500px;
+      background: #0d1117;
     }
     .example-source .hl-layer,
     .example-source textarea {
-      width: 100%; min-height: 380px;
+      width: 100%;
       background: #0d1117;
-      border: none; padding: 1rem 1.1rem;
+      border: none; padding: 1rem 1.1rem 1.5rem;
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
       font-size: 0.82rem; line-height: 1.65;
       tab-size: 2; white-space: pre;
       margin: 0; box-sizing: border-box;
     }
     .example-source .hl-layer {
-      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
       pointer-events: none; color: #c9d1d9;
-      overflow: hidden;
     }
     .example-source textarea {
-      position: relative; z-index: 1;
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 1;
       color: transparent; caret-color: #58a6ff;
-      resize: vertical; outline: none;
+      resize: none; outline: none;
       background: transparent;
-      overflow: auto;
+      overflow: hidden;
     }
     /* Syntax token colors */
     .hl-kw { color: #ff7b72; }
@@ -362,7 +365,7 @@ document.body.appendChild(document.createElement('toggle-box'))
       <h2 id="state">State</h2>
       <p>Component state is a plain object on <code>this.state</code>. Mutate it however you like, then call <code>this.render()</code> to update the DOM. No magic, no proxies, no auto-rendering — you decide exactly when the UI updates.</p>
 
-      <doc-example label="State — counter with manual rendering">
+      <doc-example label="State — counter with explicit rendering">
         <script type="text/plain">
 import { CoupElement, html } from 'coup'
 
@@ -441,42 +444,54 @@ html<span class="str">`&lt;user-card .name=${'Ada'} .role=${'Engineer'}&gt;&lt;/
         <script type="text/plain">
 import { CoupElement, html } from 'coup'
 
-class ColorCard extends CoupElement {
-  static tag = 'color-card'
-  static props = { color: String, label: String }
+class MetricCard extends CoupElement {
+  static tag = 'metric-card'
+  static props = { value: String, label: String, trend: String }
 
   template() {
+    const up = this.trend === 'up'
+    const color = up ? '#51cf66' : '#ff6b6b'
     return html`
-      <div style="display:inline-block; padding:0.5rem 1rem; margin:0.25rem;
-                  background:${this.color || '#eee'}; border-radius:4px;
-                  color:${this.color === '#333' ? '#fff' : '#333'};">
-        ${this.label || 'no label'}
+      <div class="card" style="border-color:${color}">
+        <div class="label">${this.label}</div>
+        <div class="value">
+          ${this.value} <span style="color:${color}">${up ? '↑' : '↓'}</span>
+        </div>
       </div>
     `
   }
 }
-ColorCard.define()
+MetricCard.define()
 
-class ColorPicker extends CoupElement {
-  static tag = 'color-picker'
-  colors = [
-    { color: '#ff6b6b', label: 'Red' },
-    { color: '#51cf66', label: 'Green' },
-    { color: '#339af0', label: 'Blue' },
-    { color: '#333', label: 'Dark' },
+class Dashboard extends CoupElement {
+  static tag = 'metric-dashboard'
+  metrics = [
+    { value: '1,240', label: 'Users', trend: 'up' },
+    { value: '42ms', label: 'Latency', trend: 'down' },
+    { value: '99.9%', label: 'Uptime', trend: 'up' },
   ]
 
   template() {
     return html`
-      <div>${this.colors.map(c =>
-        html`<color-card .color=${c.color} .label=${c.label}></color-card>`
+      <style>
+        .card { display:inline-block; padding:0.75rem 1.25rem; margin:0.25rem;
+          background:#1a1a2e; border-radius:6px; border-left:3px solid;
+          font-family:system-ui }
+        .label { color:#8b949e; font-size:0.75rem;
+          text-transform:uppercase; letter-spacing:0.05em }
+        .value { color:#e6edf3; font-size:1.25rem;
+          font-weight:600; margin-top:0.15rem }
+        .value span { font-size:0.8rem }
+      </style>
+      <div>${this.metrics.map(m =>
+        html`<metric-card .value=${m.value} .label=${m.label} .trend=${m.trend}></metric-card>`
       )}</div>
     `
   }
 }
-ColorPicker.define()
+Dashboard.define()
 
-document.body.appendChild(document.createElement('color-picker'))
+document.body.appendChild(document.createElement('metric-dashboard'))
         </script>
       </doc-example>
 
@@ -768,7 +783,7 @@ unsub()</code></pre>
       <h2 id="connected">connected()</h2>
       <p>Your component just appeared in the DOM. This is where you do setup work — fetch data from an API, start an interval timer, initialize a third-party library. It's the equivalent of React's <code>componentDidMount</code> or the "run once on mount" <code>useEffect</code>, except it's just a method with a clear name.</p>
 
-      <doc-example label="connected() + forms — fetch weather (manual state for async control)">
+      <doc-example label="connected() + forms — fetch weather (explicit render for async flow)">
         <script type="text/plain">
 import { CoupElement, html } from 'coup'
 
@@ -968,14 +983,31 @@ router.<span class="fn">destroy</span>()  <span class="cm">// clean up listeners
 
       <!-- ================================================================ -->
       <h2 id="debug">Debug Mode</h2>
-      <p>Flip one switch and coup watches your back. It logs warnings when you mutate state without rendering, when your template returns a stale reference, or when prop identity might cause unexpected re-renders. Turn it on during development, turn it off in production.</p>
+      <p>Flip one switch and coup watches your back.</p>
 
-      <pre><code>CoupElement.debug = <span class="kw">true</span>
+      <pre><code>CoupElement.debug = <span class="kw">true</span></code></pre>
 
-<span class="cm">// Warns on:</span>
-<span class="cm">// - State mutation without this.render()</span>
-<span class="cm">// - Stale templates (render returns same reference)</span>
-<span class="cm">// - Prop reference issues (object identity vs equality)</span></code></pre>
+      <p>When enabled:</p>
+      <ul>
+        <li><strong>Render logging</strong> — every render logs to <code>console.debug</code> with the component tag and what triggered it (prop name or "manual")</li>
+        <li><strong>Error overlay</strong> — if <code>template()</code> throws, a full-screen overlay shows the component, error message, and stack trace</li>
+        <li><strong>Prop freezing</strong> — object and array props are frozen to catch accidental mutation</li>
+        <li><strong>Prop shadowing</strong> — warns if a prop name conflicts with a CoupElement method</li>
+        <li><strong>Undefined template</strong> — warns if <code>template()</code> returns <code>undefined</code> instead of <code>html`...`</code></li>
+      </ul>
+
+      <p>Zero cost when off — all checks are gated behind the flag.</p>
+
+      <h3>Live production debugging</h3>
+      <p>To enable debug mode from the browser console in production, expose <code>CoupElement</code> on window somewhere in your app:</p>
+
+      <pre><code><span class="kw">if</span> (<span class="kw">typeof</span> window !== <span class="str">'undefined'</span>) window.CoupElement = CoupElement</code></pre>
+
+      <p>Then open the console and type:</p>
+
+      <pre><code>CoupElement.debug = <span class="kw">true</span></code></pre>
+
+      <p>Renders will start logging immediately. If a component errors, the overlay appears. No rebuild needed.</p>
 
       <!-- ================================================================ -->
       <h2 id="web-components">For Web Component Developers</h2>
@@ -1137,22 +1169,22 @@ html<span class="str">`${this.error ? html`&lt;p class="err"&gt;${this.error}&lt
       <h3>Component-scoped styles via tag name</h3>
       <p>Since every component has a unique tag name, use it as your scope:</p>
       <pre><code><span class="cm">/* Styles only apply inside &lt;task-list&gt; elements */</span>
-task-list {
-  display: block;
-  padding: <span class="num">1</span>rem;
+<span class="fn">task-list</span> {
+  <span class="attr">display</span>: block;
+  <span class="attr">padding</span>: <span class="num">1</span>rem;
 }
-task-list .item {
-  border-bottom: <span class="num">1</span>px solid #eee;
-  padding: <span class="num">0.5</span>rem <span class="num">0</span>;
+<span class="fn">task-list .item</span> {
+  <span class="attr">border-bottom</span>: <span class="num">1</span>px solid <span class="num">#eee</span>;
+  <span class="attr">padding</span>: <span class="num">0.5</span>rem <span class="num">0</span>;
 }
-task-list .item.done {
-  opacity: <span class="num">0.5</span>;
-  text-decoration: line-through;
+<span class="fn">task-list .item.done</span> {
+  <span class="attr">opacity</span>: <span class="num">0.5</span>;
+  <span class="attr">text-decoration</span>: line-through;
 }</code></pre>
       <p>This gives you practical scoping without the complexity of shadow DOM. Can styles leak? Yes — but that's also why they compose. Your app's base styles (fonts, colors, resets) apply everywhere, including inside components. That's usually what you want.</p>
 
       <h3>Inline styles for dynamic values</h3>
-      <pre><code>html<span class="str">`&lt;div style="background:${this.color}; opacity:${this.active ? 1 : 0.5}"&gt;`</span></code></pre>
+      <pre><code>html<span class="str">`&lt;div style="<span class="attr">background</span>:${<span class="kw">this</span>.color}; <span class="attr">opacity</span>:${<span class="kw">this</span>.active ? <span class="num">1</span> : <span class="num">0.5</span>}"&gt;`</span></code></pre>
 
       <h3>CSS files per component</h3>
       <p>For larger apps, put each component's styles in a CSS file that mirrors the JS file:</p>

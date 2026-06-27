@@ -251,12 +251,12 @@
 
 <span class="keyword">class</span> <span class="func">MyCounter</span> <span class="keyword">extends</span> CoupElement {
   <span class="keyword">static</span> tag = <span class="string">'my-counter'</span>
-  <span class="keyword">static</span> state = { count: <span class="string">0</span> }
+  state = { count: <span class="string">0</span> }
 
   <span class="func">template</span>() {
     <span class="keyword">return</span> html<span class="string">`
-      &lt;button @click=</span><span class="punct">${</span>() => <span class="keyword">this</span>.count++<span class="punct">}</span><span class="string">&gt;
-        Clicked </span><span class="punct">${</span><span class="keyword">this</span>.count<span class="punct">}</span><span class="string"> times
+      &lt;button @click=</span><span class="punct">${</span>() => { <span class="keyword">this</span>.state.count++; <span class="keyword">this</span>.<span class="func">render</span>() }<span class="punct">}</span><span class="string">&gt;
+        Clicked </span><span class="punct">${</span><span class="keyword">this</span>.state.count<span class="punct">}</span><span class="string"> times
       &lt;/button&gt;
     `</span>
   }
@@ -264,7 +264,7 @@
 
 MyCounter.<span class="func">define</span>()</code></pre>
     <p>
-      That's a real component. Reactive state, efficient DOM updates, automatic cleanup.
+      That's a real component. You own every render. Efficient DOM updates, automatic cleanup.
       It works in a static HTML page, a Rails app, a WordPress theme, a marketing site —
       anywhere you can put a <code>&lt;script&gt;</code> tag.
     </p>
@@ -284,11 +284,19 @@ MyCounter.<span class="func">define</span>()</code></pre>
   <section>
     <h2>The honest part</h2>
     <p>
-      Coup auto-renders when you set state. So does Alpine. So does Lit. So does every other framework.
-      That's not a new idea, and we didn't invent anything revolutionary. <strong>That's fine.</strong>
+      Coup doesn't auto-render when you change state. <strong>You call <code>this.render()</code>.</strong>
+      Every other framework hides this from you — signals, proxies, dirty-checking, compiler magic.
+      Coup doesn't. You mutate your state, you tell the DOM to update. That's it.
     </p>
     <p>
-      What coup offers is <em class="bright">a small surface area</em>. Under 500 lines. One file.
+      This is a feature. When the UI is wrong, you <code>grep</code> for missing <code>render()</code>
+      calls. That's an obvious, findable bug. When a framework auto-renders, the failure mode is
+      <em class="bright">invisible over-rendering</em> — components re-rendering 30 times a second
+      because a function reference changed, or an event handler fired more often than you expected.
+      Good luck grepping for that.
+    </p>
+    <p>
+      What coup offers is <em class="bright">a small surface area</em>. Under 300 lines. One file.
       One dependency (<a href="https://lit.dev/docs/libraries/standalone-templates/">lit-html</a>, ~3KB).
       No compiler. No virtual DOM. No reconciler. No fiber architecture. No hydration.
       No server runtime. No CLI. No starter template.
@@ -323,8 +331,8 @@ MyCounter.<span class="func">define</span>()</code></pre>
     <p>
       <strong>The invisible machinery.</strong> No virtual DOM diffing your entire tree. No
       reconciler deciding which children to re-render. No fiber scheduler slicing your work
-      into chunks you didn't ask for. When you set <code>this.count = 5</code>, a setter fires,
-      a microtask batches the update, and lit-html patches <em>only the expressions that changed</em>.
+      into chunks you didn't ask for. When you call <code>this.render()</code>, lit-html patches
+      <em>only the expressions that changed</em>.
       That's it. You could step through it in a debugger in under a minute.
     </p>
     <p>
@@ -350,15 +358,17 @@ MyCounter.<span class="func">define</span>()</code></pre>
       always no — and you don't have to take our word for it, because you can <em class="bright">see</em> it.
     </p>
     <p>
-      <strong>It won't over-render.</strong> A coup component only re-renders when you change its
-      state or a parent changes its props. No tree reconciliation. No cascading re-renders from an
-      ancestor. No "why did this component re-render?" mystery. One component, one setter, one render.
+      <strong>It can't over-render.</strong> A coup component renders when you call <code>this.render()</code>
+      or when a parent changes its props. That's it. No tree reconciliation. No cascading re-renders
+      from an ancestor. No "why did this component re-render?" mystery.
+      Zero renders happen unless someone explicitly asked for one.
     </p>
     <p>
-      <strong>It won't be hard to debug.</strong> Set a breakpoint in your setter. Step through.
-      You'll see your value change, a microtask queue, lit-html diffing your template expressions,
-      and the DOM update. Five stack frames, not fifty. The entire path from state change to
-      pixel is visible in a debugger without framework-specific tooling.
+      <strong>It won't be hard to debug.</strong> Search your code for <code>this.render()</code>.
+      Every render is a line you wrote. Step through in a debugger — you'll see your
+      state change, lit-html diffing your template expressions, and the DOM update.
+      Five stack frames, not fifty. The entire path from state change to
+      pixel is visible without framework-specific tooling.
     </p>
     <p>
       <strong>It won't add overhead.</strong> A coup component is a custom element — the same
@@ -368,18 +378,57 @@ MyCounter.<span class="func">define</span>()</code></pre>
     </p>
   </section>
 
+  <!-- What we learned -->
+  <section>
+    <h2>What we learned</h2>
+    <p>
+      Coup originally shipped with <code>this.render()</code> as the only way to update the DOM.
+      Then we added reactive state — <code>static state = { count: 0 }</code> — because it seemed
+      simpler. Set a property, the component re-renders. No boilerplate. Elegant. <em class="bright">We
+      were very proud of ourselves.</em>
+    </p>
+    <p>
+      Then we built a real app with it. A Spotify playlist manager with external SDK events,
+      streaming callbacks, timers, and child components. And we found the bugs.
+    </p>
+    <p>
+      <strong>Bug 1:</strong> <code>.bind()</code> in templates creates a new function object every render.
+      The child sees a new prop, re-renders. A component re-rendering once per second (playback timer)
+      caused its children to re-render once per second too — for no reason.
+    </p>
+    <p>
+      <strong>Bug 2:</strong> An SDK firing <code>player_state_changed</code> five times per track
+      change. Each event set the same state to an equal-but-not-identical object. Five renders
+      where zero were needed. And we didn't notice until we added debug logging.
+    </p>
+    <p>
+      These are <em class="bright">exactly</em> the problems coup was built to prevent. We wrote a
+      framework to stop invisible over-rendering, then added a feature that reintroduced it.
+      Even <em>we</em> fell for the reactivity trap.
+    </p>
+    <p>
+      So we reverted. Removed reactive state entirely. Went back to <code>this.render()</code>.
+      Then we added a two-line guard — if the state didn't actually change, don't render.
+      <strong>169 renders per play click → 1.</strong> Zero renders during 10 seconds of playback.
+      That guard was trivial to write because <code>this.render()</code> is a line you choose to add.
+      Under reactive state, <em class="bright">preventing</em> a render meant understanding the
+      framework's equality semantics. Much harder problem.
+    </p>
+    <p>
+      <em style="color: #8b949e;">The full story: <a href="./REACTIVE_STATE_POSTMORTEM.md">Reactive State Postmortem</a></em>
+    </p>
+  </section>
+
   <!-- Lifecycle -->
   <section>
     <h2>Lifecycle you can hold in your head</h2>
-    <p>Seven hooks. No dependency arrays. No cleanup-return-function guessing games.</p>
+    <p>Six hooks. No dependency arrays. No cleanup-return-function guessing games.</p>
     <ul class="hooks">
       <li><code>connected()</code> Element added to the DOM. Set up your state, start timers, fetch data.</li>
       <li><code>firstUpdated()</code> Fires once after the first render. DOM is populated — safe to query, measure, focus.</li>
       <li><code>updated()</code> DOM just re-rendered. Measure elements, init third-party widgets, scroll.</li>
       <li><code>disconnected()</code> Element removed. Clean up whatever you started.</li>
       <li><code>propsChanged(changes)</code> One or more props changed. You get <code>{ propName: { old, new } }</code>.</li>
-      <li><code>stateChanged(changes)</code> One or more static state values changed. Same format.</li>
-      <li><code>storeChanged(store, state)</code> A subscribed Store updated. You decide if and when to render.</li>
     </ul>
     <p>
       Compare with React's <code>useEffect</code> — a single hook that handles mounting,
@@ -394,7 +443,7 @@ MyCounter.<span class="func">define</span>()</code></pre>
   <section>
     <h2>The proof</h2>
     <p>
-      Eleven runnable examples. No installs. No builds. Click and read the source.
+      Twelve runnable examples. No installs. No builds. Click and read the source.
       Every one is a single HTML file with an importmap and vanilla JavaScript.
     </p>
 

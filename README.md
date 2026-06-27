@@ -147,12 +147,12 @@ template() {
 
 ### `render()`
 
-Call `this.render()` to manually trigger a re-render. Props auto-render. For internal state, call `this.render()` explicitly.
+Call `this.render()` to update the DOM. Props auto-render when set by a parent. For internal state, you call `this.render()` — every render is a line you wrote, visible and grep-able.
 
 ```js
 onClick() {
   this.state.expanded = !this.state.expanded
-  this.render()  // manual pattern — still works
+  this.render()  // you decide when the DOM updates
 }
 ```
 
@@ -875,7 +875,7 @@ Runs a headless Playwright test suite covering rendering, adding, removing, reor
 | Decision | Rationale |
 |---|---|
 | **No shadow DOM** | Global CSS just works. No slots, no style encapsulation headaches. |
-| **Manual `this.state` + `render()`** | State management — set properties on `this.state`, call `this.render()`. |
+| **Manual `this.state` + `render()`** | [We tried reactive state and reverted.](./REACTIVE_STATE_POSTMORTEM.md) Auto-rendering hides over-renders behind reference identity checks and external event timing. Explicit `this.render()` makes every render visible and grep-able — if the UI is wrong, search for the missing call. |
 | **Auto-render on prop changes** | Props come from a parent — the parent is saying "your inputs changed." |
 | **`template()` vs `render()`** | Separating definition from trigger prevents accidental recursion. |
 | **Global events via `window`** | Simple pub/sub. No event bus library. Auto-cleanup on disconnect. |

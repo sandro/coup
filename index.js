@@ -6,8 +6,9 @@
 // All other state changes require explicit this.render() calls.
 
 import { render as litRender, html, svg, nothing } from 'lit-html'
+import { repeat } from 'lit-html/directives/repeat.js'
 
-export { html, svg, nothing }
+export { html, svg, nothing, repeat }
 
 // --- Shallow equality for arrays and plain objects ---
 // Prevents re-renders when a parent passes a new array/object reference
