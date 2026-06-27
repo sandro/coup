@@ -1335,6 +1335,44 @@ disconnected() {
 <span class="kw">this</span>.state.user.name = <span class="str">'Ada'</span>
 <span class="kw">this</span>.<span class="fn">render</span>()</code></pre>
 
+      <h3>Rendering on every external event</h3>
+      <p>SDKs, WebSockets, and browser APIs can fire events much faster than you'd expect. If you call <code>this.render()</code> on every event without checking whether anything actually changed, you get silent over-rendering.</p>
+      <pre><code><span class="cm">// ❌ Spotify SDK fires 5+ events per track change — renders every time</span>
+onPlayerState(playState) {
+  <span class="kw">this</span>.state.track = playState.track
+  <span class="kw">this</span>.state.paused = playState.paused
+  <span class="kw">this</span>.<span class="fn">render</span>()
+}
+
+<span class="cm">// ✅ Guard — only render when something actually changed</span>
+onPlayerState(playState) {
+  <span class="kw">const</span> trackChanged = playState.track?.id !== <span class="kw">this</span>.state.track?.id
+  <span class="kw">const</span> pauseChanged = playState.paused !== <span class="kw">this</span>.state.paused
+  <span class="kw">if</span> (trackChanged) <span class="kw">this</span>.state.track = playState.track
+  <span class="kw">if</span> (pauseChanged) <span class="kw">this</span>.state.paused = playState.paused
+  <span class="kw">if</span> (trackChanged || pauseChanged) <span class="kw">this</span>.<span class="fn">render</span>()
+}</code></pre>
+      <p>This guard took one of our apps from 169 renders per play click down to 1. The pattern: compare first, mutate if different, render once.</p>
+
+      <h3>Redundant render in <code>connected()</code></h3>
+      <p>Coup already schedules a render when a component connects. Calling <code>this.render()</code> at the end of <code>connected()</code> doubles the initial render.</p>
+      <pre><code><span class="cm">// ❌ Renders twice on mount</span>
+connected() {
+  <span class="kw">this</span>.state.items = [<span class="str">'a'</span>, <span class="str">'b'</span>, <span class="str">'c'</span>]
+  <span class="kw">this</span>.<span class="fn">render</span>()  <span class="cm">// coup already scheduled one</span>
+}
+
+<span class="cm">// ✅ Just set state — coup's auto-render picks it up</span>
+connected() {
+  <span class="kw">this</span>.state.items = [<span class="str">'a'</span>, <span class="str">'b'</span>, <span class="str">'c'</span>]
+}
+
+<span class="cm">// ✅ Async is different — render after the await</span>
+<span class="kw">async</span> connected() {
+  <span class="kw">this</span>.state.data = <span class="kw">await</span> fetch(<span class="str">'/api/items'</span>).then(r => r.json())
+  <span class="kw">this</span>.<span class="fn">render</span>()  <span class="cm">// needed — microtask already fired</span>
+}</code></pre>
+
       <h3>Not cleaning up timers</h3>
       <pre><code><span class="cm">// ❌ Timer fires after component is removed — error or stale render</span>
 connected() {
