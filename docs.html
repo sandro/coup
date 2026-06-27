@@ -188,8 +188,7 @@
       <a href="#defining">Defining Components</a>
       <a href="#template">template()</a>
       <a href="#render">render()</a>
-      <a href="#static-state">static state</a>
-      <a href="#state-changed">stateChanged()</a>
+      <a href="#state">state</a>
       <a href="#props">Props</a>
       <a href="#attrs">Attributes</a>
       <a href="#events">Events</a>
@@ -257,13 +256,13 @@ import { CoupElement, html } from 'coup'
 
 class MyCounter extends CoupElement {
   static tag = 'my-counter'
-  static state = { count: 0 }
+  state = { count: 0 }
 
   template() {
     return html`
-      <button @click=${() => this.count++}
+      <button @click=${() => { this.state.count++; this.render() }}
               style="padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer;">
-        Clicked ${this.count} times
+        Clicked ${this.state.count} times
       </button>
     `
   }
@@ -320,26 +319,31 @@ UserCard.<span class="fn">define</span>()</code></pre>
 
       <!-- ================================================================ -->
       <h2 id="render">render()</h2>
-      <p>Most of the time you don't call <code>render()</code> yourself — <code>static state</code> and <code>static props</code> handle it automatically. But <code>this.render()</code> is always there when you need it: after an async operation, after mutating a plain object, or when you want the DOM to update at a precise moment.</p>
+      <p>Props auto-render when changed. For everything else, call <code>this.render()</code> after updating state. It's synchronous — the DOM updates immediately, so you always know exactly when the user sees what.</p>
 
-      <doc-example label="Toggle — static state (recommended)">
+      <doc-example label="Toggle — state + this.render()">
         <script type="text/plain">
 import { CoupElement, html } from 'coup'
 
 class ToggleBox extends CoupElement {
   static tag = 'toggle-box'
-  static state = { open: false }
+  state = { open: false }
+
+  toggle() {
+    this.state.open = !this.state.open
+    this.render()
+  }
 
   template() {
     return html`
       <div>
-        <button @click=${() => this.open = !this.open}
+        <button @click=${() => this.toggle()}
                 style="padding: 0.4rem 0.8rem; cursor: pointer;">
-          ${this.open ? '▼ Hide' : '▶ Show'} details
+          ${this.state.open ? '▼ Hide' : '▶ Show'} details
         </button>
-        ${this.open ? html`
+        ${this.state.open ? html`
           <p style="margin-top: 0.5rem; padding: 0.5rem; background: #f0f0f0; border-radius: 4px;">
-            Static state auto-rendered. No this.render() needed.
+            State updated, then this.render() called.
           </p>
         ` : ''}
       </div>
@@ -352,46 +356,34 @@ document.body.appendChild(document.createElement('toggle-box'))
         </script>
       </doc-example>
 
-      <h3>Manual alternative</h3>
-      <p>If you need full control over when the DOM updates — async workflows, multi-step mutations, or non-render bookkeeping — use a plain object and call <code>this.render()</code> yourself.</p>
-
-      <pre><code><span class="kw">class</span> <span class="fn">ToggleBox</span> <span class="kw">extends</span> CoupElement {
-  <span class="kw">static</span> tag = <span class="str">'toggle-box'</span>
-  state = { open: <span class="kw">false</span> }
-
-  <span class="fn">toggle</span>() {
-    <span class="kw">this</span>.state.open = !<span class="kw">this</span>.state.open
-    <span class="kw">this</span>.<span class="fn">render</span>()  <span class="cm">// you decide when the DOM updates</span>
-  }
-
-  template() {
-    <span class="kw">return</span> html<span class="str">`&lt;button @click=\${() => this.toggle()}&gt;
-      \${this.state.open ? 'Hide' : 'Show'}
-    &lt;/button&gt;`</span>
-  }
-}</code></pre>
+      <p><code>this.render()</code> is synchronous. After an <code>await</code>, you know the DOM is updated on the next line. No <code>requestAnimationFrame</code> guessing. Props and store changes batch via microtask, but explicit <code>this.render()</code> updates the DOM right now.</p>
 
       <!-- ================================================================ -->
-      <h2 id="static-state">static state</h2>
-      <p>Reactive internal state with auto-rendering. Declare <code>static state</code> on your class, and coup generates getters and setters — just like props. When you write <code>this.count++</code>, coup schedules a re-render via microtask. No <code>this.render()</code> calls. No <code>this.state.count</code> nesting. Just <code>this.count</code>.</p>
+      <h2 id="state">State</h2>
+      <p>Component state is a plain object on <code>this.state</code>. Mutate it however you like, then call <code>this.render()</code> to update the DOM. No magic, no proxies, no auto-rendering — you decide exactly when the UI updates.</p>
 
-      <doc-example label="static state — counter with auto-rendering">
+      <doc-example label="State — counter with manual rendering">
         <script type="text/plain">
 import { CoupElement, html } from 'coup'
 
 class ClickCounter extends CoupElement {
   static tag = 'click-counter'
-  static state = { count: 0 }
+  state = { count: 0 }
+
+  inc(n) {
+    this.state.count += n
+    this.render()
+  }
 
   template() {
     return html`
       <div style="display:flex; gap:0.5rem; align-items:center;">
-        <button @click=${() => this.count--}
+        <button @click=${() => this.inc(-1)}
                 style="padding:0.3rem 0.7rem; cursor:pointer;">−</button>
         <strong style="font-size:1.2rem; min-width:2rem; text-align:center;">
-          ${this.count}
+          ${this.state.count}
         </strong>
-        <button @click=${() => this.count++}
+        <button @click=${() => this.inc(1)}
                 style="padding:0.3rem 0.7rem; cursor:pointer;">+</button>
       </div>
     `
@@ -403,89 +395,26 @@ document.body.appendChild(document.createElement('click-counter'))
         </script>
       </doc-example>
 
-      <h3>Declaration forms</h3>
-      <p>Three ways to declare state, same as props:</p>
-      <pre><code><span class="cm">// Object with defaults (most common)</span>
-<span class="kw">static</span> state = { count: <span class="num">0</span>, label: <span class="str">'ready'</span>, items: [] }
+      <h3>The pattern</h3>
+      <p>Every state workflow follows the same two steps: mutate <code>this.state</code>, then call <code>this.render()</code>. Multiple mutations before a single <code>this.render()</code> are fine — you control the batch.</p>
 
-<span class="cm">// Object with types (initialized to undefined)</span>
-<span class="kw">static</span> state = { count: Number, label: String }
+      <pre><code><span class="cm">// Multiple changes, one render</span>
+<span class="kw">this</span>.state.count = <span class="num">5</span>
+<span class="kw">this</span>.state.label = <span class="str">'done'</span>
+<span class="kw">this</span>.state.items = [...<span class="kw">this</span>.state.items, newItem]
+<span class="kw">this</span>.<span class="fn">render</span>()</code></pre>
 
-<span class="cm">// Array (all initialized to undefined)</span>
-<span class="kw">static</span> state = [<span class="str">'count'</span>, <span class="str">'label'</span>]</code></pre>
+      <h3>Async state</h3>
+      <p>For async workflows, call <code>this.render()</code> at each point where the user should see a change — once to show loading, once when data arrives:</p>
 
-      <h3>How it works</h3>
-      <p>Coup generates a getter and setter for each declared state property. The setter checks identity (<code>old !== val</code>), and if the value changed, schedules a render via <code>queueMicrotask</code>. Multiple changes in the same synchronous block coalesce into a single render:</p>
+      <pre><code><span class="kw">async</span> <span class="fn">load</span>() {
+  <span class="kw">this</span>.state.loading = <span class="kw">true</span>
+  <span class="kw">this</span>.<span class="fn">render</span>()  <span class="cm">// show loading state</span>
 
-      <pre><code><span class="cm">// All three changes → one render</span>
-<span class="kw">this</span>.count = <span class="num">5</span>
-<span class="kw">this</span>.label = <span class="str">'done'</span>
-<span class="kw">this</span>.items = [...<span class="kw">this</span>.items, newItem]</code></pre>
-
-      <h3>Object mutation gotcha</h3>
-      <p>Same rule as props — identity comparison means mutating an object in place won't trigger a re-render. Create a new reference:</p>
-
-      <pre><code><span class="cm">// ❌ Same reference — no re-render</span>
-<span class="kw">this</span>.items.push(item)
-
-<span class="cm">// ✅ New array — re-render triggers</span>
-<span class="kw">this</span>.items = [...<span class="kw">this</span>.items, item]
-
-<span class="cm">// ✅ New object — re-render triggers</span>
-<span class="kw">this</span>.user = { ...<span class="kw">this</span>.user, name: <span class="str">'Ada'</span> }</code></pre>
-
-      <h3>Coexistence with manual state</h3>
-      <p>You can use both <code>static state</code> and a manual <code>this.state = {}</code> object in the same component. Static state properties live directly on <code>this</code> (via getters/setters), while <code>this.state</code> is a plain object you manage yourself. They don't conflict — different namespaces, different mechanisms.</p>
-
-      <pre><code><span class="kw">class</span> <span class="fn">ChatBox</span> <span class="kw">extends</span> CoupElement {
-  <span class="kw">static</span> tag = <span class="str">'chat-box'</span>
-  <span class="kw">static</span> state = { messages: [], input: <span class="str">''</span> }  <span class="cm">// auto-renders</span>
-  state = { scrollLocked: <span class="kw">true</span> }               <span class="cm">// manual — doesn't trigger render</span>
-
-  template() { <span class="cm">/* this.messages, this.input, this.state.scrollLocked */</span> }
-}</code></pre>
-
-      <h3>When to use which</h3>
-      <table>
-        <thead><tr><th>Use</th><th>When</th></tr></thead>
-        <tbody>
-          <tr><td><code>static state</code></td><td>Most component state — counters, toggles, form inputs, anything that should trigger a re-render</td></tr>
-          <tr><td>Manual <code>this.state</code></td><td>Non-render bookkeeping (scroll position, abort controllers), or when you need to batch multiple async steps into one render</td></tr>
-        </tbody>
-      </table>
-
-      <!-- ================================================================ -->
-      <h2 id="state-changed">stateChanged()</h2>
-      <p>When <code>static state</code> properties change, <code>stateChanged</code> fires with all changes batched into one call — same pattern as <code>propsChanged</code>. You get an object showing what changed, with old and new values. Useful for derived state, side effects, or resetting related values.</p>
-
-      <pre><code><span class="fn">stateChanged</span>(changes) {
-  <span class="cm">// changes = { name: { old: prevValue, new: newValue }, ... }</span>
-  <span class="kw">if</span> (<span class="str">'messages'</span> <span class="kw">in</span> changes) {
-    <span class="cm">// New messages arrived — reset scroll lock</span>
-    <span class="kw">this</span>.userHasScrolled = <span class="kw">false</span>
-  }
-}</code></pre>
-
-      <p>The render already happened (or is scheduled) — <code>stateChanged</code> is a notification, not a gate. Use it for side effects like logging, derived state, or triggering related updates. Don't call <code>this.render()</code> here — the state change already scheduled one.</p>
-
-      <pre><code><span class="kw">class</span> <span class="fn">SearchPanel</span> <span class="kw">extends</span> CoupElement {
-  <span class="kw">static</span> tag = <span class="str">'search-panel'</span>
-  <span class="kw">static</span> state = { query: <span class="str">''</span>, results: [], page: <span class="num">1</span> }
-
-  <span class="fn">stateChanged</span>(changes) {
-    <span class="kw">if</span> (<span class="str">'query'</span> <span class="kw">in</span> changes) {
-      <span class="cm">// Query changed — reset to page 1</span>
-      <span class="kw">this</span>.page = <span class="num">1</span>
-      <span class="kw">this</span>.<span class="fn">search</span>()
-    }
-  }
-
-  <span class="kw">async</span> <span class="fn">search</span>() {
-    <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">`/api/search?q=\${this.query}&amp;page=\${this.page}`</span>)
-    <span class="kw">this</span>.results = <span class="kw">await</span> res.<span class="fn">json</span>()
-  }
-
-  template() { <span class="cm">/* ... */</span> }
+  <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api/data'</span>)
+  <span class="kw">this</span>.state.data = <span class="kw">await</span> res.<span class="fn">json</span>()
+  <span class="kw">this</span>.state.loading = <span class="kw">false</span>
+  <span class="kw">this</span>.<span class="fn">render</span>()  <span class="cm">// show data</span>
 }</code></pre>
 
       <!-- ================================================================ -->
@@ -613,10 +542,11 @@ import { CoupElement, html } from 'coup'
 class KeyLogger extends CoupElement {
   static tag = 'key-logger'
   static events = { 'keydown': 'onKey' }
-  static state = { keys: [] }
+  state = { keys: [] }
 
   onKey(e) {
-    this.keys = [...this.keys.slice(-9), e.key]
+    this.state.keys = [...this.state.keys.slice(-9), e.key]
+    this.render()
   }
 
   template() {
@@ -624,7 +554,7 @@ class KeyLogger extends CoupElement {
       <div>
         <p style="font-size:0.85rem; color:#666;">Click here, then press any key:</p>
         <div style="display:flex; gap:0.3rem; flex-wrap:wrap; margin-top:0.3rem; min-height:2rem;">
-          ${this.keys.map(k => html`
+          ${this.state.keys.map(k => html`
             <kbd style="padding:0.2rem 0.5rem; background:#f4f4f4; border:1px solid #ddd;
                         border-radius:3px; font-family:monospace; font-size:0.85rem;">${k}</kbd>
           `)}
@@ -679,10 +609,11 @@ ColorButton.define()
 class ColorDisplay extends CoupElement {
   static tag = 'color-display'
   static events = { 'color:picked': 'onPick' }
-  static state = { picked: 'none' }
+  state = { picked: 'none' }
 
   onPick(e) {
-    this.picked = e.detail
+    this.state.picked = e.detail
+    this.render()
   }
 
   template() {
@@ -693,7 +624,7 @@ class ColorDisplay extends CoupElement {
         <color-button .color=${'#339af0'}></color-button>
       </div>
       <p style="font-size:0.9rem;">
-        Picked: <strong style="color:${this.picked}">${this.picked}</strong>
+        Picked: <strong style="color:${this.state.picked}">${this.state.picked}</strong>
       </p>
     `
   }
@@ -824,7 +755,7 @@ unsub()</code></pre>
         &nbsp;&nbsp;↓<br>
         <strong>updated()</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;← DOM is ready, measure / scroll / init widgets<br>
         &nbsp;&nbsp;↓<br>
-        state changes → <strong>stateChanged()</strong> → auto re-render<br>
+        state changes → mutate this.state + <strong>this.render()</strong><br>
         prop changes → <strong>propsChanged()</strong> → auto re-render<br>
         store changes → <strong>storeChanged()</strong> or auto re-render<br>
         &nbsp;&nbsp;↓<br>
@@ -984,14 +915,15 @@ import { CoupElement, html } from 'coup'
 
 class MiniRouter extends CoupElement {
   static tag = 'mini-router'
-  static state = { page: 'home' }
+  state = { page: 'home' }
 
   go(page) {
-    this.page = page
+    this.state.page = page
+    this.render()
   }
 
   template() {
-    const page = this.page
+    const page = this.state.page
     const pages = ['home', 'about', 'contact']
     return html`
       <nav style="display:flex; gap:1rem; margin-bottom:0.75rem;">
@@ -1283,17 +1215,14 @@ vendor/
       <p>These are real bugs we hit while building production apps with coup. Learn from our mistakes.</p>
 
       <h3>Forgetting <code>this.render()</code></h3>
-      <p>When using manual <code>this.state = {}</code>, the most common mistake. You update state but nothing changes on screen. <strong>Static state eliminates this problem entirely</strong> — <code>static state</code> properties auto-render when changed.</p>
-      <pre><code><span class="cm">// ❌ Manual state — nothing happens without render()</span>
+      <p>The most common mistake. You update state but nothing changes on screen. Every state mutation needs a corresponding <code>this.render()</code> call.</p>
+      <pre><code><span class="cm">// ❌ Nothing happens — forgot render()</span>
 <span class="kw">this</span>.state.count++
 
-<span class="cm">// ✅ Manual state — call render()</span>
+<span class="cm">// ✅ Update state, then render</span>
 <span class="kw">this</span>.state.count++
-<span class="kw">this</span>.render()
-
-<span class="cm">// ✅ Static state — auto-renders, no render() needed</span>
-<span class="kw">this</span>.count++</code></pre>
-      <p>Turn on debug mode (<code>CoupElement.debug = true</code>) during development — it warns when you mutate manual state without rendering.</p>
+<span class="kw">this</span>.<span class="fn">render</span>()</code></pre>
+      <p>Turn on debug mode (<code>CoupElement.debug = true</code>) during development — it warns when you mutate state without rendering.</p>
 
       <h3>Overriding <code>connectedCallback</code> instead of <code>connected()</code></h3>
       <p>Coup sets up props, stores, and events in <code>connectedCallback</code>. If you override it, you skip that setup.</p>
@@ -1347,16 +1276,18 @@ disconnected() {
 <span class="cm">// ✅ Option B: let coup handle it</span>
 <span class="kw">static</span> events = { <span class="str">'resize'</span>: <span class="str">'onResize'</span> }</code></pre>
 
-      <h3>Mutating objects in static state</h3>
-      <p>Static state uses identity checks (<code>old !== val</code>). Mutating an object in place doesn't change its reference, so no re-render happens.</p>
-      <pre><code><span class="cm">// ❌ Same reference — no re-render</span>
-<span class="kw">this</span>.items.push(newItem)
+      <h3>Object mutation without rendering</h3>
+      <p>Mutating objects in <code>this.state</code> is fine — but you still need to call <code>this.render()</code> afterward. The mutation itself doesn't trigger anything.</p>
+      <pre><code><span class="cm">// ❌ Mutated but forgot render()</span>
+<span class="kw">this</span>.state.items.push(newItem)
 
-<span class="cm">// ✅ New reference — re-render triggers</span>
-<span class="kw">this</span>.items = [...<span class="kw">this</span>.items, newItem]
+<span class="cm">// ✅ Mutate, then render</span>
+<span class="kw">this</span>.state.items.push(newItem)
+<span class="kw">this</span>.<span class="fn">render</span>()
 
-<span class="cm">// ✅ Same for objects</span>
-<span class="kw">this</span>.user = { ...<span class="kw">this</span>.user, name: <span class="str">'Ada'</span> }</code></pre>
+<span class="cm">// ✅ Same for nested objects</span>
+<span class="kw">this</span>.state.user.name = <span class="str">'Ada'</span>
+<span class="kw">this</span>.<span class="fn">render</span>()</code></pre>
 
       <h3>Not cleaning up timers</h3>
       <pre><code><span class="cm">// ❌ Timer fires after component is removed — error or stale render</span>
@@ -1750,15 +1681,16 @@ import { CoupElement, html } from 'coup'
 
 class CharCounter extends CoupElement {
   static tag = 'char-counter'
-  static state = { text: '' }
+  state = { text: '' }
 
   // Class field arrow — auto-binds 'this', safe to pass directly to @input
   onInput = (e) => {
-    this.text = e.target.value
+    this.state.text = e.target.value
+    this.render()
   }
 
   template() {
-    const remaining = 280 - this.text.length
+    const remaining = 280 - this.state.text.length
     return html`
       <textarea
         rows="3"
