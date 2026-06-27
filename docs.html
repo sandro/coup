@@ -1373,6 +1373,13 @@ connected() {
   <span class="kw">this</span>.<span class="fn">render</span>()  <span class="cm">// needed — microtask already fired</span>
 }</code></pre>
 
+      <h3>Direct DOM writes vs <code>this.render()</code></h3>
+      <p>For high-frequency updates (scrubbers, scroll positions, animations), rendering the full template every frame can feel wasteful. You can skip the render and write directly to the DOM instead:</p>
+      <pre><code><span class="cm">// Direct DOM write — updates one element without re-rendering</span>
+<span class="kw">this</span>.state.position = newValue
+<span class="kw">this</span>.$(<span class="str">'input[type=range]'</span>).value = newValue</code></pre>
+      <p>This is fast, but anything else in your template that reads <code>this.state.position</code> (timestamps, progress bars, labels) won't update until the next full render. You're trading consistency for speed. Often the right call is to just call <code>this.render()</code> — lit-html's diffing is fast enough for once-per-second updates. Save direct DOM writes for truly hot paths like <code>mousemove</code> or <code>requestAnimationFrame</code> loops.</p>
+
       <h3>Not cleaning up timers</h3>
       <pre><code><span class="cm">// ❌ Timer fires after component is removed — error or stale render</span>
 connected() {
