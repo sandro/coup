@@ -1275,6 +1275,20 @@ html<span class="str">`&lt;task-item item=${obj}&gt;&lt;/task-item&gt;`</span>
 <span class="cm">// ✅ Dot prefix passes the JavaScript value</span>
 html<span class="str">`&lt;task-item .item=${obj}&gt;&lt;/task-item&gt;`</span></code></pre>
 
+      <h3><code>.bind()</code> in templates causes child re-renders</h3>
+      <p>Every call to <code>.bind()</code> creates a new function reference. If you pass it as a prop, the child sees a "changed" prop on every parent render and re-renders for nothing.</p>
+      <pre><code><span class="cm">// ❌ New function every render → child re-renders every time parent does</span>
+html<span class="str">`&lt;my-child .onClick=${this.handle.bind(this)}&gt;`</span>
+
+<span class="cm">// ❌ Same problem — arrow wrapper in template creates a new function too</span>
+html<span class="str">`&lt;my-child .onClick=${() => this.handle()}&gt;`</span>
+
+<span class="cm">// ✅ Class field arrow — bound once, same reference every render</span>
+handle = () => { <span class="cm">/* ... */</span> }
+html<span class="str">`&lt;my-child .onClick=${this.handle}&gt;`</span></code></pre>
+      <p>This is JavaScript, not a coup bug — <code>===</code> fails for new function objects. In a real app we saw 169 renders per click traced back to this pattern. Use class field arrows for any function passed as a prop.</p>
+      <p><strong>Note:</strong> this only matters for <em>props</em> (dot-prefixed like <code>.onClick</code>). Event handlers (<code>@click</code>) are fine with inline arrows — lit-html handles those differently and they don't trigger child re-renders.</p>
+
       <h3>Async <code>storeChanged</code> without <code>this.render()</code></h3>
       <p>If you define <code>storeChanged</code>, coup doesn't auto-render — you own it. If your <code>storeChanged</code> does async work and never calls <code>this.render()</code>, the component goes stale.</p>
       <pre><code><span class="cm">// ❌ Component never updates</span>
