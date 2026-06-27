@@ -1,6 +1,9 @@
 // coup - a web component library that puts you in control of the render loop
 // Uses lit-html for efficient tagged template rendering + diffing
 // Zero build, zero shadow DOM, zero magic renders you didn't ask for
+//
+// Rendering model: manual this.render(). Props auto-render via _scheduleRender.
+// All other state changes require explicit this.render() calls.
 
 import { render as litRender, html, svg, nothing } from 'lit-html'
 
@@ -96,7 +99,7 @@ function esc(s) {
 
 const RESERVED = new Set([
   'template', 'render', 'connected', 'disconnected',
-  'firstUpdated', 'updated', 'propsChanged', 'stateChanged',
+  'firstUpdated', 'updated', 'propsChanged',
   'storeChanged', 'emit', '$', '$$',
 ])
 
@@ -155,40 +158,6 @@ export class CoupElement extends HTMLElement {
   constructor() {
     super()
     this._setupProps()
-    this._setupState()
-  }
-
-  // --- Debug: state mutation tracking ---
-
-  _stateProxy() {
-    this._stateProxied = true
-    const tag = this.constructor.tag
-    let dirty = false
-    let renderCalled = false
-    const origRender = this.render.bind(this)
-
-    this.render = () => {
-      renderCalled = true
-      dirty = false
-      origRender()
-    }
-
-    const handler = {
-      set(target, prop, value) {
-        target[prop] = value
-        dirty = true
-        renderCalled = false
-        // Check on next microtask if render was called
-        queueMicrotask(() => {
-          if (dirty && !renderCalled) {
-            warn(tag, `state.${prop} changed but render() was not called. UI is stale.`)
-          }
-        })
-        return true
-      }
-    }
-
-    this.state = new Proxy(this.state, handler)
   }
 
   // --- Registration ---
@@ -300,77 +269,6 @@ export class CoupElement extends HTMLElement {
     }
   }
 
-  // --- State: auto-generated getters/setters with auto-render ---
-
-  _setupState() {
-    const state = this.constructor.state
-    if (!state) return
-
-    // Support object and array forms:
-    //   static state = { count: 0, label: 'ready' }        — defaults
-    //   static state = { count: Number, label: String }     — types (init undefined)
-    //   static state = ['count', 'label']                   — all undefined
-    const entries = Array.isArray(state)
-      ? state.map(name => [name, undefined])
-      : Object.entries(state)
-
-    const isType = v => v === String || v === Number || v === Boolean
-      || v === Object || v === Array
-
-    this._state_vals = {}
-
-    for (const [name, typeOrDefault] of entries) {
-      if (_debug && RESERVED.has(name)) {
-        warn(this.constructor.tag, `state "${name}" shadows a CoupElement method — pick a different name`)
-      }
-      // Collision check: can't be both a prop and state
-      if (this._props.hasOwnProperty(name)) {
-        throw new Error(
-          `${this.constructor.name}: "${name}" declared in both static props and static state`
-        )
-      }
-
-      const def = isType(typeOrDefault) ? undefined : typeOrDefault
-      this._state_vals[name] = Array.isArray(def) ? [...def]
-        : (def !== null && typeof def === 'object') ? { ...def }
-        : def
-
-      Object.defineProperty(this, name, {
-        get() {
-          return this._state_vals[name]
-        },
-        set(val) {
-          const old = this._state_vals[name]
-          if (!shallowEqual(old, val)) {
-            if (_debug && val !== null && typeof val === 'object') {
-              const p = Object.getPrototypeOf(val)
-              if (Array.isArray(val) || p === Object.prototype || p === null) Object.freeze(val)
-            }
-            this._state_vals[name] = val
-            if (_debug) this._lastStateChange = name
-            this._scheduleRender()
-            // Batch state changes — fire stateChanged once per microtask
-            if (this._connected && this.stateChanged !== CoupElement.prototype.stateChanged) {
-              if (!this._stateChanges) this._stateChanges = {}
-              this._stateChanges[name] = { old, new: val }
-              if (!this._stateChangePending) {
-                this._stateChangePending = true
-                queueMicrotask(() => {
-                  const changes = this._stateChanges
-                  this._stateChanges = null
-                  this._stateChangePending = false
-                  this.stateChanged(changes)
-                })
-              }
-            }
-          }
-        },
-        enumerable: true,
-        configurable: true,
-      })
-    }
-  }
-
   // --- Microtask-batched rendering ---
 
   _scheduleRender() {
@@ -391,9 +289,8 @@ export class CoupElement extends HTMLElement {
     this._rendering = true
     this._renderPending = false  // clear so scheduled microtask is a no-op
     if (_debug) {
-      const trigger = this._lastStateChange || this._lastPropChange || 'manual'
+      const trigger = this._lastPropChange || 'manual'
       console.debug(`[coup] <${this.constructor.tag}> render (${trigger})`)
-      this._lastStateChange = null
       this._lastPropChange = null
     }
     let ok = false
@@ -450,10 +347,6 @@ export class CoupElement extends HTMLElement {
 
   connectedCallback() {
     this._connected = true
-    // Debug: wrap state in proxy on first connect (after class fields init)
-    if (_debug && this.state && !this._stateProxied) {
-      this._stateProxy()
-    }
     this._unbindEvents()
     this._bindEvents()
     this._bindSubscriptions()
@@ -506,10 +399,6 @@ export class CoupElement extends HTMLElement {
   /** Called after every render (DOM is up to date). Override for post-render work like
    *  measuring elements, initializing third-party widgets, or scrolling. */
   updated() {}
-
-  /** Called when static state properties change. Receives { name: { old, new } }.
-   *  Changes are batched — fires once per microtask with all accumulated changes. */
-  stateChanged(_changes) {}
 
   // --- Subscriptions ---
   //
