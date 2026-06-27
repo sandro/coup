@@ -3,7 +3,7 @@ CoupElement.debug = true
 
 class MediaLightbox extends CoupElement {
   static tag = 'media-lightbox'
-  static state = { open: false, index: 0 }
+  state = { open: false, index: 0 }
   static events = { 'keydown': 'onKeydown' }
 
   items = []
@@ -28,41 +28,46 @@ class MediaLightbox extends CoupElement {
   }
 
   openAt(i) {
-    this.index = i
-    this.open = true
+    this.state.index = i
+    this.state.open = true
+    this.render()
     document.body.style.overflow = 'hidden'
     this._preload()
   }
 
   close() {
     this._pauseVideo()
-    this.open = false
+    this.state.open = false
+    this.render()
     document.body.style.overflow = ''
   }
 
   next() {
     if (this.items.length <= 1) return
     this._pauseVideo()
-    this.index = (this.index + 1) % this.items.length
+    this.state.index = (this.state.index + 1) % this.items.length
+    this.render()
     this._preload()
   }
 
   prev() {
     if (this.items.length <= 1) return
     this._pauseVideo()
-    this.index = (this.index - 1 + this.items.length) % this.items.length
+    this.state.index = (this.state.index - 1 + this.items.length) % this.items.length
+    this.render()
     this._preload()
   }
 
   goTo(i) {
-    if (i === this.index) return
+    if (i === this.state.index) return
     this._pauseVideo()
-    this.index = i
+    this.state.index = i
+    this.render()
     this._preload()
   }
 
   onKeydown(e) {
-    if (!this.open) return
+    if (!this.state.open) return
     if (e.key === 'Escape') this.close()
     else if (e.key === 'ArrowRight') this.next()
     else if (e.key === 'ArrowLeft') this.prev()
@@ -76,7 +81,7 @@ class MediaLightbox extends CoupElement {
   _preload() {
     const len = this.items.length
     if (len <= 1) return
-    ;[(this.index + 1) % len, (this.index - 1 + len) % len].forEach(i => {
+    ;[(this.state.index + 1) % len, (this.state.index - 1 + len) % len].forEach(i => {
       if (this.items[i]?.type === 'image') {
         const img = new Image()
         img.src = this.items[i].src
@@ -89,7 +94,7 @@ class MediaLightbox extends CoupElement {
   }
 
   template() {
-    const item = this.items[this.index]
+    const item = this.items[this.state.index]
     const multi = this.items.length > 1
 
     return html`
@@ -107,7 +112,7 @@ class MediaLightbox extends CoupElement {
         `)}
       </div>
 
-      <div class="lb-overlay ${this.open ? 'lb-open' : ''}"
+      <div class="lb-overlay ${this.state.open ? 'lb-open' : ''}"
            @click=${(e) => { if (e.target.classList.contains('lb-overlay')) this.close() }}>
         ${item ? html`
           <button class="lb-close" @click=${() => this.close()} aria-label="Close">✕</button>
@@ -125,12 +130,12 @@ class MediaLightbox extends CoupElement {
           </div>
 
           ${item.caption ? html`<div class="lb-caption">${item.caption}</div>` : ''}
-          ${multi ? html`<div class="lb-counter">${this.index + 1} / ${this.items.length}</div>` : ''}
+          ${multi ? html`<div class="lb-counter">${this.state.index + 1} / ${this.items.length}</div>` : ''}
 
           ${multi ? html`
             <div class="lb-thumbs">
               ${this.items.map((t, i) => html`
-                <div class="lb-thumb ${i === this.index ? 'active' : ''}" @click=${() => this.goTo(i)}>
+                <div class="lb-thumb ${i === this.state.index ? 'active' : ''}" @click=${() => this.goTo(i)}>
                   <img src="${t.type === 'video' ? t.poster : t.src}" alt="" draggable="false">
                 </div>
               `)}

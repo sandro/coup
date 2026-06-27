@@ -29,7 +29,7 @@ function formatChange(n) {
 class CryptoList extends CoupElement {
   static tag = 'crypto-list'
 
-  static state = {
+  state = {
     coins: [],
     page: 1,
     loading: false,
@@ -59,13 +59,14 @@ class CryptoList extends CoupElement {
   }
 
   async loadPage() {
-    if (this.loading || this.done) return
+    if (this.state.loading || this.state.done) return
 
-    this.loading = true
-    this.error = null
+    this.state.loading = true
+    this.state.error = null
+    this.render()
 
     try {
-      const url = `${API}?vs_currency=usd&order=market_cap_desc&per_page=50&page=${this.page}`
+      const url = `${API}?vs_currency=usd&order=market_cap_desc&per_page=50&page=${this.state.page}`
       const res = await fetch(url)
 
       if (!res.ok) {
@@ -79,15 +80,16 @@ class CryptoList extends CoupElement {
       const data = await res.json()
 
       if (!data.length) {
-        this.done = true
+        this.state.done = true
       } else {
-        this.coins = [...this.coins, ...data]
-        this.page = this.page + 1
+        this.state.coins = [...this.state.coins, ...data]
+        this.state.page = this.state.page + 1
       }
     } catch (err) {
-      this.error = err.message
+      this.state.error = err.message
     } finally {
-      this.loading = false
+      this.state.loading = false
+      this.render()
     }
   }
 
@@ -101,7 +103,7 @@ class CryptoList extends CoupElement {
         <span>Market Cap</span>
       </div>
 
-      ${this.coins.map(c => {
+      ${this.state.coins.map(c => {
         const pct = c.price_change_percentage_24h
         const changeClass = pct > 0 ? 'positive' : pct < 0 ? 'negative' : ''
         return html`
@@ -118,11 +120,11 @@ class CryptoList extends CoupElement {
         `
       })}
 
-      ${this.error ? html`<div class="error-msg">⚠️ ${this.error}</div>` : nothing}
+      ${this.state.error ? html`<div class="error-msg">⚠️ ${this.state.error}</div>` : nothing}
 
-      ${this.loading ? html`<div class="spinner"></div>` : nothing}
+      ${this.state.loading ? html`<div class="spinner"></div>` : nothing}
 
-      ${this.done ? html`<div class="end-msg">All coins loaded</div>` : nothing}
+      ${this.state.done ? html`<div class="end-msg">All coins loaded</div>` : nothing}
 
       <div class="sentinel"></div>
     `

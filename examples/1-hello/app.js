@@ -20,10 +20,11 @@ HelloGreeting.define()
 class HelloApp extends CoupElement {
   static tag = 'hello-app'
 
-  static state = { name: '' }
+  state = { name: '' }
 
   onInput(e) {
-    this.name = e.target.value
+    this.state.name = e.target.value
+    this.render()
   }
 
   template() {
@@ -31,10 +32,10 @@ class HelloApp extends CoupElement {
       <input
         type="text"
         placeholder="Type your name…"
-        .value=${this.name}
+        .value=${this.state.name}
         @input=${(e) => this.onInput(e)}
       />
-      <hello-greeting .name=${this.name}></hello-greeting>
+      <hello-greeting .name=${this.state.name}></hello-greeting>
     `
   }
 }
