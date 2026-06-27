@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>coup docs</title>
+  <title>coup — docs</title>
   <script type="importmap">
   {
     "imports": {
@@ -234,7 +234,7 @@
 
     <main>
       <h1>coup docs</h1>
-      <p>A framework you can read in one sitting. One dependency. No build step. <a href="./" style="color:#58a6ff;">Read the manifesto →</a></p>
+      <p>They took the render loop. Take it back. One dependency. No build step.<br><a href="./" style="color:#58a6ff;">Read the manifesto →</a></p>
 
       <!-- ================================================================ -->
       <h2 id="quick-start">Quick Start</h2>
@@ -323,7 +323,7 @@ UserCard.<span class="fn">define</span>()</code></pre>
 
       <!-- ================================================================ -->
       <h2 id="render">render()</h2>
-      <p>Props auto-render when changed. For everything else, call <code>this.render()</code> after updating state. It's synchronous — the DOM updates immediately, so you always know exactly when the user sees what.</p>
+      <p>Props auto-render when changed. For everything else, you call <code>this.render()</code>. That's the coup — you control every render. It's synchronous — the DOM updates immediately, so you always know exactly when the user sees what.</p>
 
       <doc-example label="Toggle — state + this.render()">
         <script type="text/plain">
@@ -754,7 +754,7 @@ unsub()</code></pre>
 
       <!-- ================================================================ -->
       <h2 id="lifecycle">Lifecycle</h2>
-      <p>A component's life is a straight line, not a flowchart. Seven hooks cover everything from birth to death. Compare that to React's <code>useEffect</code> dependency arrays or Angular's change detection strategies — coup gives you a hook for each moment that matters and nothing else.</p>
+      <p>A component's life is a straight line, not a flowchart. Six hooks cover everything from birth to death. Compare that to React's <code>useEffect</code> dependency arrays or Angular's change detection strategies — coup gives you a hook for each moment that matters and nothing else.</p>
 
       <div class="lifecycle">
         constructor<br>
@@ -1202,7 +1202,7 @@ html<span class="str">`${this.error ? html`&lt;p class="err"&gt;${this.error}&lt
       <h3>Small app (1–5 components)</h3>
       <pre><code>index.html          <span class="cm">← importmap, styles, &lt;my-app&gt;</span>
 app.js              <span class="cm">← all components in one file</span></code></pre>
-      <p>This is how all 7 coup examples are structured. One HTML file, one JS file. When a file hits ~400 lines, split it up.</p>
+      <p>This is how the coup examples are structured. One HTML file, one JS file. When a file hits ~400 lines, split it up.</p>
 
       <h3>Medium app (5–20 components)</h3>
       <pre><code>index.html
@@ -1245,7 +1245,7 @@ vendor/
 
       <!-- ================================================================ -->
       <h2 id="gotchas">Common Mistakes</h2>
-      <p>These are real bugs we hit while building production apps with coup. Learn from our mistakes.</p>
+      <p>Real bugs from production apps. One of these took us from 169 renders per click down to 1.</p>
 
       <h3>Forgetting <code>this.render()</code></h3>
       <p>The most common mistake. You update state but nothing changes on screen. Every state mutation needs a corresponding <code>this.render()</code> call.</p>

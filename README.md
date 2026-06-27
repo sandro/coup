@@ -1,10 +1,10 @@
 # coup
 
-A coup against the tyranny of the modern frontend.
+They took the render loop. Take it back. That's a coup.
 
 You don't need a build step. You don't need a virtual DOM. You don't need hooks, signals, effects, memos, reducers, selectors, or a PhD in reactivity theory to put HTML on a screen.
 
-**A framework you can read in one sitting. One dependency ([lit-html](https://lit.dev/docs/libraries/standalone-templates/), ~3KB gzip). No build step. No CLI. No starter template.**
+**Under 500 lines. One dependency ([lit-html](https://lit.dev/docs/libraries/standalone-templates/), ~3KB gzip). No build step. No CLI. No starter template.**
 
 > **[Live examples →](https://sandro.github.io/coup/)**
 
@@ -84,7 +84,7 @@ Mutate `this.state`, call `this.render()`. Props auto-render when set by a paren
 </script>
 ```
 
-One URL. Everything included — lit-html, `repeat`, `classMap`, `styleMap`, `unsafeHTML`, `Router`. **7.8KB gzipped.** No importmap, no coordination, no trailing-slash gotchas.
+One URL. Everything included — lit-html, `repeat`, `classMap`, `styleMap`, `unsafeHTML`, `Router`. **7.4KB gzipped.** No importmap, no coordination, no trailing-slash gotchas.
 
 Use the importmap approach for multi-page sites (shared lit-html cache). Use the standalone bundle for prototypes, single-file apps, and when you want one import line.
 
