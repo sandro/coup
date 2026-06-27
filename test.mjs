@@ -173,50 +173,7 @@ const attrPropsResult = await page.evaluate(async () => {
 assert(attrPropsResult.t1 === 'abc-123', `Attr→prop initial: "${attrPropsResult.t1}" (expected "abc-123")`)
 assert(attrPropsResult.t2 === 'xyz-789', `Attr→prop change: "${attrPropsResult.t2}" (expected "xyz-789")`)
 
-// Test 12: Debug mode — warns on state change without render()
-const debugResult = await page.evaluate(async () => {
-  const { CoupElement, html } = await import('coup')
-
-  CoupElement.debug = true
-
-  const warnings = []
-  const origWarn = console.warn
-  console.warn = (...args) => warnings.push(args.join(' '))
-
-  class DebugTest extends CoupElement {
-    static tag = 'debug-test'
-    state = { count: 0 }
-    template() { return html`<span>${this.state.count}</span>` }
-  }
-  DebugTest.define()
-
-  const el = document.createElement('debug-test')
-  document.body.appendChild(el)
-  await new Promise(r => setTimeout(r, 50))
-
-  // Mutate state without calling render()
-  el.state.count = 42
-  await new Promise(r => setTimeout(r, 50))
-
-  const staleWarning = warnings.some(w => w.includes('render() was not called'))
-
-  // Now mutate and call render() — should NOT warn
-  warnings.length = 0
-  el.state.count = 99
-  el.render()
-  await new Promise(r => setTimeout(r, 50))
-
-  const falseWarning = warnings.some(w => w.includes('render() was not called'))
-
-  console.warn = origWarn
-  CoupElement.debug = false
-  el.remove()
-  return { staleWarning, falseWarning }
-})
-assert(debugResult.staleWarning === true, 'Debug: warns on state change without render()')
-assert(debugResult.falseWarning === false, 'Debug: no false warning when render() is called')
-
-// Test 13: Debug mode — warns on undefined template return
+// Test 12: Debug mode — warns on undefined template return
 const debugTplResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
 
@@ -244,7 +201,7 @@ const debugTplResult = await page.evaluate(async () => {
 })
 assert(debugTplResult.undefinedWarning === true, 'Debug: warns on undefined template return')
 
-// Test 14: Same object reference prop set — silently skips (no render, no warning)
+// Test 13: Same object reference prop set — silently skips (no render, no warning)
 // When a parent re-renders, lit-html re-assigns the same object to child props.
 // This is normal and should not warn — it's indistinguishable from mutation.
 const debugPropResult = await page.evaluate(async () => {
@@ -288,7 +245,7 @@ const debugPropResult = await page.evaluate(async () => {
 assert(debugPropResult.noWarning === true, 'Debug: no warning on same object reference prop set')
 assert(debugPropResult.noExtraRender === true, 'Debug: no extra render on same object reference prop set')
 
-// Test 15: propsChanged fires once with all changes batched
+// Test 14: propsChanged fires once with all changes batched
 const propsChangedResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
 
@@ -324,7 +281,7 @@ assert(propsChangedResult.changes.a?.new === 'hello', 'propsChanged has a')
 assert(propsChangedResult.changes.b?.new === 'world', 'propsChanged has b')
 assert(propsChangedResult.changes.c?.new === 42, 'propsChanged has c')
 
-// Test 16: propsChanged fires for initial props set before connection
+// Test 15: propsChanged fires for initial props set before connection
 const initialPropsResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
   
@@ -352,7 +309,7 @@ assert(initialPropsResult.received !== null, 'propsChanged fired for initial pro
 assert(initialPropsResult.received.name?.new === 'hello', 'initial props has name')
 assert(initialPropsResult.received.count?.new === 42, 'initial props has count')
 
-// Test 17: updated() fires after every render
+// Test 16: updated() fires after every render
 const updatedResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
 
@@ -388,7 +345,7 @@ assert(updatedResult.countAfterMount >= 1, `updated() fired on mount: ${updatedR
 assert(updatedResult.totalCount >= 2, `updated() fired again after render: ${updatedResult.totalCount}`)
 assert(updatedResult.domContent === 'second', `DOM was current in updated(): "${updatedResult.domContent}"`)
 
-// Test 18: storeChanged() callback on store subscription
+// Test 17: storeChanged() callback on store subscription
 const storeChangedResult = await page.evaluate(async () => {
   const { CoupElement, Store, html } = await import('coup')
 
@@ -428,7 +385,7 @@ assert(storeChangedResult.storeMatch === true, 'storeChanged receives the correc
 // Hector edge-case tests — issues discovered when building a real app
 // =========================================================================
 
-// Test 19: Array-style static props create working getters/setters
+// Test 18: Array-style static props create working getters/setters
 const arrayPropsResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
 
@@ -453,7 +410,7 @@ const arrayPropsResult = await page.evaluate(async () => {
 })
 assert(arrayPropsResult.text === 'hello-42', `Array-style props render: "${arrayPropsResult.text}" (expected "hello-42")`)
 
-// Test 20: Array-style props fire propsChanged with initial values
+// Test 19: Array-style props fire propsChanged with initial values
 const arrayPropsInitialResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
 
@@ -480,7 +437,7 @@ assert(arrayPropsInitialResult.received !== null, 'Array props: propsChanged fir
 assert(arrayPropsInitialResult.received.name?.new === 'color', 'Array props: initial name correct')
 assert(arrayPropsInitialResult.received.value?.new === 'red', 'Array props: initial value correct')
 
-// Test 21: propsChanged does NOT re-fire on reconnection (keyed list reorder)
+// Test 20: propsChanged does NOT re-fire on reconnection (keyed list reorder)
 const reconnectResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
 
@@ -513,7 +470,7 @@ const reconnectResult = await page.evaluate(async () => {
 assert(reconnectResult.callsAfterMount === 1, `propsChanged fired once on mount: ${reconnectResult.callsAfterMount}`)
 assert(reconnectResult.totalCalls === 1, `propsChanged NOT re-fired on reconnect: ${reconnectResult.totalCalls} (expected 1)`)
 
-// Test 22: updated() does NOT fire when template() throws
+// Test 21: updated() does NOT fire when template() throws
 const updatedErrorResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
 
@@ -538,7 +495,7 @@ const updatedErrorResult = await page.evaluate(async () => {
 })
 assert(updatedErrorResult.updatedFired === false, 'updated() does NOT fire after template() error')
 
-// Test 23: storeChanged + _scheduleRender doesn't double-render
+// Test 22: storeChanged + _scheduleRender doesn't double-render
 const doubleRenderResult = await page.evaluate(async () => {
   const { CoupElement, Store, html } = await import('coup')
 
@@ -574,7 +531,7 @@ const doubleRenderResult = await page.evaluate(async () => {
 })
 assert(doubleRenderResult.rendersAfterUpdate === 1, `Store update + storeChanged render: ${doubleRenderResult.rendersAfterUpdate} renders (expected 1)`)
 
-// Test 24: Store subscription auto-renders without storeChanged
+// Test 23: Store subscription auto-renders without storeChanged
 const autoRenderResult = await page.evaluate(async () => {
   const { CoupElement, Store, html } = await import('coup')
 
@@ -604,7 +561,7 @@ const autoRenderResult = await page.evaluate(async () => {
 assert(autoRenderResult.t1 === 'init', `Auto-render initial: "${autoRenderResult.t1}"`)
 assert(autoRenderResult.t2 === 'updated', `Auto-render after store change: "${autoRenderResult.t2}"`)
 
-// Test 25: Disconnection cleans up store subscriptions
+// Test 24: Disconnection cleans up store subscriptions
 const disconnectSubResult = await page.evaluate(async () => {
   const { CoupElement, Store, html } = await import('coup')
 
@@ -640,7 +597,7 @@ const disconnectSubResult = await page.evaluate(async () => {
 })
 assert(disconnectSubResult.storeChangedAfterDisconnect === false, 'Store subscription cleaned up on disconnect')
 
-// Test 26: Multiple stores — storeChanged identifies which store changed
+// Test 25: Multiple stores — storeChanged identifies which store changed
 const multiStoreResult = await page.evaluate(async () => {
   const { CoupElement, Store, html } = await import('coup')
 
@@ -676,7 +633,7 @@ assert(multiStoreResult.calls.length === 2, `Multi-store: ${multiStoreResult.cal
 assert(multiStoreResult.calls[0].which === 'A' && multiStoreResult.calls[0].state.a === 10, 'Multi-store: storeA identified')
 assert(multiStoreResult.calls[1].which === 'B' && multiStoreResult.calls[1].state.b === 20, 'Multi-store: storeB identified')
 
-// Test 27: Prop change detection — same value doesn't trigger render
+// Test 26: Prop change detection — same value doesn't trigger render
 const sameValueResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
 
@@ -708,7 +665,7 @@ const sameValueResult = await page.evaluate(async () => {
 })
 assert(sameValueResult.countBefore === sameValueResult.countAfter, `Same value skip: renders before=${sameValueResult.countBefore} after=${sameValueResult.countAfter}`)
 
-// Test 28: Global events bind and unbind correctly
+// Test 27: Global events bind and unbind correctly
 const eventsResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
 
@@ -743,7 +700,7 @@ const eventsResult = await page.evaluate(async () => {
 assert(eventsResult.received.length === 1, `Events: ${eventsResult.received.length} received (expected 1)`)
 assert(eventsResult.received[0] === 'a', 'Events: received while connected')
 
-// Test 29: emit() dispatches CustomEvent on window
+// Test 28: emit() dispatches CustomEvent on window
 const emitResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
 
@@ -768,7 +725,7 @@ const emitResult = await page.evaluate(async () => {
 })
 assert(emitResult.receivedDetail?.foo === 'bar', `emit() dispatches event with detail: ${JSON.stringify(emitResult.receivedDetail)}`)
 
-// Test 30: Store.set with function updater
+// Test 29: Store.set with function updater
 const storeFnResult = await page.evaluate(async () => {
   const { Store } = await import('coup')
 
@@ -785,7 +742,7 @@ const storeFnResult = await page.evaluate(async () => {
 assert(storeFnResult.after === 15, `Store fn updater: ${storeFnResult.after} (expected 15)`)
 assert(storeFnResult.after2 === 30, `Store fn chained: ${storeFnResult.after2} (expected 30)`)
 
-// Test 31: Store.set preserves other keys (shallow merge)
+// Test 30: Store.set preserves other keys (shallow merge)
 const storeMergeResult = await page.evaluate(async () => {
   const { Store } = await import('coup')
 
@@ -797,7 +754,7 @@ assert(storeMergeResult.state.a === 1, 'Store merge: a preserved')
 assert(storeMergeResult.state.b === 20, 'Store merge: b updated')
 assert(storeMergeResult.state.c === 3, 'Store merge: c preserved')
 
-// Test 32: Store unsubscribe works
+// Test 31: Store unsubscribe works
 const storeUnsubResult = await page.evaluate(async () => {
   const { Store } = await import('coup')
 
@@ -816,7 +773,7 @@ const storeUnsubResult = await page.evaluate(async () => {
 assert(storeUnsubResult.countBefore === 1, 'Store unsub: called before unsub')
 assert(storeUnsubResult.countAfter === 1, 'Store unsub: not called after unsub')
 
-// Test 33: Async storeChanged — no render until component calls this.render()
+// Test 32: Async storeChanged — no render until component calls this.render()
 const asyncStoreResult = await page.evaluate(async () => {
   const { CoupElement, Store, html } = await import('coup')
 
@@ -866,7 +823,7 @@ assert(asyncStoreResult.rendersAfter === asyncStoreResult.rendersAfterMount + 1,
   `Async storeChanged: exactly 1 render after async (${asyncStoreResult.rendersAfter})`)
 assert(asyncStoreResult.text === 'loading', `Async storeChanged: DOM updated to "loading"`)
 
-// Test 34: storeChanged without this.render() — no render happens
+// Test 33: storeChanged without this.render() — no render happens
 const noRenderResult = await page.evaluate(async () => {
   const { CoupElement, Store, html } = await import('coup')
 
@@ -906,7 +863,7 @@ assert(noRenderResult.rendersTotal === noRenderResult.rendersAfterMount,
 assert(noRenderResult.sideEffects.length === 2, `storeChanged without render(): side effects recorded (${noRenderResult.sideEffects})`)
 assert(noRenderResult.sideEffects[0] === 1 && noRenderResult.sideEffects[1] === 2, 'storeChanged without render(): correct values')
 
-// Test 35: Async storeChanged — multiple rapid store updates, only last render wins
+// Test 34: Async storeChanged — multiple rapid store updates, only last render wins
 const asyncBatchResult = await page.evaluate(async () => {
   const { CoupElement, Store, html } = await import('coup')
 
@@ -955,7 +912,7 @@ assert(asyncBatchResult.rendersTotal === asyncBatchResult.rendersAfterMount + 3,
 // firstUpdated() tests
 // =========================================================================
 
-// Test 36: firstUpdated fires once after first render
+// Test 35: firstUpdated fires once after first render
 const firstUpdatedResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
 
@@ -1004,7 +961,7 @@ assert(firstUpdatedResult.firstUpdatedTotal === 1, `firstUpdated: fired exactly 
 assert(firstUpdatedResult.updatedTotal >= 3, `updated: fired on every render (${firstUpdatedResult.updatedTotal})`)
 assert(firstUpdatedResult.domInFirstUpdated === 'initial', `firstUpdated: DOM was populated ("${firstUpdatedResult.domInFirstUpdated}")`)
 
-// Test 37: firstUpdated does NOT re-fire on reconnection
+// Test 36: firstUpdated does NOT re-fire on reconnection
 const firstUpdatedReconnectResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
 
@@ -1031,7 +988,7 @@ const firstUpdatedReconnectResult = await page.evaluate(async () => {
 })
 assert(firstUpdatedReconnectResult.count === 1, `firstUpdated: not re-fired on reconnect (${firstUpdatedReconnectResult.count})`)
 
-// Test 38: firstUpdated fires before updated on first render
+// Test 37: firstUpdated fires before updated on first render
 const firstUpdatedOrderResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
 
@@ -1056,379 +1013,10 @@ assert(firstUpdatedOrderResult.order[0] === 'firstUpdated', 'firstUpdated fires 
 assert(firstUpdatedOrderResult.order[1] === 'updated', 'updated fires after firstUpdated')
 
 // =========================================================================
-// static state tests
+// Shallow equality tests (props)
 // =========================================================================
 
-// Test 39: static state creates reactive getters/setters with auto-render
-const staticStateResult = await page.evaluate(async () => {
-  const { CoupElement, html } = await import('coup')
-
-  let renderCount = 0
-
-  class StaticStateTest extends CoupElement {
-    static tag = 'static-state-test'
-    static state = { count: 0, label: 'ready' }
-    template() {
-      renderCount++
-      return html`<span>${this.count} ${this.label}</span>`
-    }
-  }
-  StaticStateTest.define()
-
-  const el = document.createElement('static-state-test')
-  document.body.appendChild(el)
-  await new Promise(r => setTimeout(r, 100))
-
-  const textAfterMount = el.querySelector('span')?.textContent
-  const rendersAfterMount = renderCount
-
-  el.count = 5
-  el.label = 'done'
-  await new Promise(r => setTimeout(r, 100))
-
-  const textAfterUpdate = el.querySelector('span')?.textContent
-  const rendersAfterUpdate = renderCount
-
-  el.remove()
-  return { textAfterMount, textAfterUpdate, rendersAfterMount, rendersAfterUpdate }
-})
-assert(staticStateResult.textAfterMount === '0 ready', `static state defaults: "${staticStateResult.textAfterMount}"`)
-assert(staticStateResult.textAfterUpdate === '5 done', `static state updated: "${staticStateResult.textAfterUpdate}"`)
-
-// Test 40: static state batches multiple changes into one render
-const stateBatchResult = await page.evaluate(async () => {
-  const { CoupElement, html } = await import('coup')
-
-  let renderCount = 0
-
-  class StateBatch extends CoupElement {
-    static tag = 'state-batch'
-    static state = { a: 0, b: 0, c: 0 }
-    template() {
-      renderCount++
-      return html`<span>${this.a}-${this.b}-${this.c}</span>`
-    }
-  }
-  StateBatch.define()
-
-  const el = document.createElement('state-batch')
-  document.body.appendChild(el)
-  await new Promise(r => setTimeout(r, 100))
-
-  const rendersBefore = renderCount
-
-  // Set three state properties synchronously — should batch into one render
-  el.a = 1
-  el.b = 2
-  el.c = 3
-  await new Promise(r => setTimeout(r, 100))
-
-  const rendersAfter = renderCount
-  const text = el.querySelector('span')?.textContent
-
-  el.remove()
-  return { rendersBefore, rendersAfter, text }
-})
-assert(stateBatchResult.rendersAfter - stateBatchResult.rendersBefore === 1,
-  `static state batching: ${stateBatchResult.rendersAfter - stateBatchResult.rendersBefore} renders (expected 1)`)
-assert(stateBatchResult.text === '1-2-3', `static state batch result: "${stateBatchResult.text}"`)
-
-// Test 41: static state same-value check skips render
-const stateSameValueResult = await page.evaluate(async () => {
-  const { CoupElement, html } = await import('coup')
-
-  let renderCount = 0
-
-  class StateSameValue extends CoupElement {
-    static tag = 'state-same-value'
-    static state = { count: 42 }
-    template() {
-      renderCount++
-      return html`<span>${this.count}</span>`
-    }
-  }
-  StateSameValue.define()
-
-  const el = document.createElement('state-same-value')
-  document.body.appendChild(el)
-  await new Promise(r => setTimeout(r, 100))
-
-  const rendersBefore = renderCount
-
-  el.count = 42 // same value
-  await new Promise(r => setTimeout(r, 100))
-
-  el.remove()
-  return { rendersBefore, rendersAfter: renderCount }
-})
-assert(stateSameValueResult.rendersBefore === stateSameValueResult.rendersAfter,
-  `static state same value: no extra render (${stateSameValueResult.rendersBefore} === ${stateSameValueResult.rendersAfter})`)
-
-// Test 42: stateChanged callback fires with batched changes
-const stateChangedResult = await page.evaluate(async () => {
-  const { CoupElement, html } = await import('coup')
-
-  const calls = []
-
-  class StateChangedTest extends CoupElement {
-    static tag = 'state-changed-test'
-    static state = { x: 0, y: 0 }
-    stateChanged(changes) {
-      calls.push(structuredClone(changes))
-    }
-    template() { return html`<span>${this.x}-${this.y}</span>` }
-  }
-  StateChangedTest.define()
-
-  const el = document.createElement('state-changed-test')
-  document.body.appendChild(el)
-  await new Promise(r => setTimeout(r, 100))
-
-  el.x = 10
-  el.y = 20
-  await new Promise(r => setTimeout(r, 100))
-
-  el.remove()
-  return { callCount: calls.length, changes: calls[0] }
-})
-assert(stateChangedResult.callCount === 1, `stateChanged: ${stateChangedResult.callCount} calls (expected 1)`)
-assert(stateChangedResult.changes.x?.old === 0 && stateChangedResult.changes.x?.new === 10, 'stateChanged: x change correct')
-assert(stateChangedResult.changes.y?.old === 0 && stateChangedResult.changes.y?.new === 20, 'stateChanged: y change correct')
-
-// Test 43: static state collision with static props throws error
-const collisionResult = await page.evaluate(async () => {
-  const { CoupElement, html } = await import('coup')
-
-  // Test collision detection directly — _setupProps then _setupState
-  // by checking that the constructor logic works
-  class Collision extends CoupElement {
-    static tag = 'collision-test-43'
-    static props = { name: String }
-    static state = { name: '' }
-    template() { return html`<span>${this.name}</span>` }
-  }
-  Collision.define()
-
-  let threw = false
-  let message = ''
-  const errors = []
-  const origError = console.error
-  
-  // Listen for the error thrown during construction
-  try {
-    const el = document.createElement('collision-test-43')
-    // If we get here, check if the error was caught internally
-    // The browser may catch constructor errors in createElement
-    threw = false
-  } catch (e) {
-    threw = true
-    message = e.message
-  }
-
-  // Alternative: test _setupState directly
-  if (!threw) {
-    try {
-      // Call _setupState manually on a fresh instance to test the guard
-      const TestClass = class extends CoupElement {
-        static tag = 'collision-direct-43'
-        static props = { foo: String }
-        static state = { foo: 0 }
-      }
-      // _setupProps runs in super constructor, then _setupState
-      // We can test the guard by checking _props
-      const proto = TestClass.prototype
-      const instance = Object.create(proto)
-      instance._props = { foo: undefined }
-      instance.constructor = TestClass
-      instance._state_vals = undefined
-      // Manually call _setupState
-      instance._setupState()
-      threw = false
-    } catch (e) {
-      threw = true
-      message = e.message
-    }
-  }
-
-  return { threw, message }
-})
-assert(collisionResult.threw === true, `Collision: throws on prop/state name conflict (threw: ${collisionResult.threw})`)
-assert(collisionResult.threw && collisionResult.message && collisionResult.message.includes('both static props and static state'),
-  `Collision message: "${collisionResult.message}"`)
-
-// Test 44: static state coexists with manual this.state
-const coexistResult = await page.evaluate(async () => {
-  const { CoupElement, html } = await import('coup')
-
-  class Coexist extends CoupElement {
-    static tag = 'coexist-test'
-    static state = { reactiveCount: 0 }
-    state = { manualFlag: false }
-
-    template() {
-      return html`<span>${this.reactiveCount}-${this.state.manualFlag}</span>`
-    }
-  }
-  Coexist.define()
-
-  const el = document.createElement('coexist-test')
-  document.body.appendChild(el)
-  await new Promise(r => setTimeout(r, 100))
-
-  const textBefore = el.querySelector('span')?.textContent
-
-  // Reactive state auto-renders
-  el.reactiveCount = 5
-  await new Promise(r => setTimeout(r, 100))
-  const textAfterReactive = el.querySelector('span')?.textContent
-
-  // Manual state needs explicit render
-  el.state.manualFlag = true
-  await new Promise(r => setTimeout(r, 100))
-  const textWithoutRender = el.querySelector('span')?.textContent
-
-  el.render()
-  await new Promise(r => setTimeout(r, 50))
-  const textAfterManualRender = el.querySelector('span')?.textContent
-
-  el.remove()
-  return { textBefore, textAfterReactive, textWithoutRender, textAfterManualRender }
-})
-assert(coexistResult.textBefore === '0-false', `Coexist initial: "${coexistResult.textBefore}"`)
-assert(coexistResult.textAfterReactive === '5-false', `Coexist after reactive: "${coexistResult.textAfterReactive}"`)
-assert(coexistResult.textWithoutRender === '5-false', `Coexist manual without render: stale ("${coexistResult.textWithoutRender}")`)
-assert(coexistResult.textAfterManualRender === '5-true', `Coexist after manual render: "${coexistResult.textAfterManualRender}"`)
-
-// Test 45: static state with type declarations (Number, String, Boolean) — init as undefined
-const stateTypesResult = await page.evaluate(async () => {
-  const { CoupElement, html } = await import('coup')
-
-  class StateTypes extends CoupElement {
-    static tag = 'state-types'
-    static state = { count: Number, label: String, active: Boolean }
-    template() {
-      return html`<span>${this.count}-${this.label}-${this.active}</span>`
-    }
-  }
-  StateTypes.define()
-
-  const el = document.createElement('state-types')
-  document.body.appendChild(el)
-  await new Promise(r => setTimeout(r, 100))
-
-  const textBefore = el.querySelector('span')?.textContent
-
-  el.count = 42
-  el.label = 'hi'
-  el.active = true
-  await new Promise(r => setTimeout(r, 100))
-
-  const textAfter = el.querySelector('span')?.textContent
-
-  el.remove()
-  return { textBefore, textAfter }
-})
-assert(stateTypesResult.textBefore === '--', `State types init undefined (renders empty): "${stateTypesResult.textBefore}"`)
-assert(stateTypesResult.textAfter === '42-hi-true', `State types after set: "${stateTypesResult.textAfter}"`)
-
-// Test 46: static state array form
-const stateArrayResult = await page.evaluate(async () => {
-  const { CoupElement, html } = await import('coup')
-
-  class StateArray extends CoupElement {
-    static tag = 'state-array'
-    static state = ['count', 'label']
-    template() {
-      return html`<span>${this.count ?? 'none'}-${this.label ?? 'none'}</span>`
-    }
-  }
-  StateArray.define()
-
-  const el = document.createElement('state-array')
-  document.body.appendChild(el)
-  await new Promise(r => setTimeout(r, 100))
-
-  const textBefore = el.querySelector('span')?.textContent
-
-  el.count = 10
-  el.label = 'test'
-  await new Promise(r => setTimeout(r, 100))
-
-  const textAfter = el.querySelector('span')?.textContent
-
-  el.remove()
-  return { textBefore, textAfter }
-})
-assert(stateArrayResult.textBefore === 'none-none', `State array init: "${stateArrayResult.textBefore}"`)
-assert(stateArrayResult.textAfter === '10-test', `State array after set: "${stateArrayResult.textAfter}"`)
-
-// Test 47: stateChanged can trigger additional reactive state (batched together)
-const stateChangedDerivedResult = await page.evaluate(async () => {
-  const { CoupElement, html } = await import('coup')
-
-  let renderCount = 0
-
-  class StateChangedDerived extends CoupElement {
-    static tag = 'state-changed-derived'
-    static state = { messages: 0, userHasScrolled: true }
-    stateChanged(changes) {
-      if ('messages' in changes) {
-        this.userHasScrolled = false // derived state change
-      }
-    }
-    template() {
-      renderCount++
-      return html`<span>${this.messages}-${this.userHasScrolled}</span>`
-    }
-  }
-  StateChangedDerived.define()
-
-  const el = document.createElement('state-changed-derived')
-  document.body.appendChild(el)
-  await new Promise(r => setTimeout(r, 100))
-
-  const rendersBefore = renderCount
-
-  el.messages = 5
-  await new Promise(r => setTimeout(r, 100))
-
-  const text = el.querySelector('span')?.textContent
-
-  el.remove()
-  return { text, rendersBefore, rendersAfter: renderCount }
-})
-assert(stateChangedDerivedResult.text === '5-false', `stateChanged derived: "${stateChangedDerivedResult.text}"`)
-
-// Test 48: firstUpdated works with static state
-const firstUpdatedWithStateResult = await page.evaluate(async () => {
-  const { CoupElement, html } = await import('coup')
-
-  let firstUpdatedVal = null
-
-  class FirstUpdatedState extends CoupElement {
-    static tag = 'first-updated-state'
-    static state = { count: 42 }
-    firstUpdated() {
-      firstUpdatedVal = this.querySelector('span')?.textContent
-    }
-    template() { return html`<span>${this.count}</span>` }
-  }
-  FirstUpdatedState.define()
-
-  const el = document.createElement('first-updated-state')
-  document.body.appendChild(el)
-  await new Promise(r => setTimeout(r, 100))
-
-  el.remove()
-  return { firstUpdatedVal }
-})
-assert(firstUpdatedWithStateResult.firstUpdatedVal === '42', `firstUpdated with static state: "${firstUpdatedWithStateResult.firstUpdatedVal}"`)
-
-// =========================================================================
-// Shallow equality tests
-// =========================================================================
-
-// Test 49: Prop set with equivalent array skips render
+// Test 38: Prop set with equivalent array skips render
 const shallowArrayResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
 
@@ -1472,7 +1060,7 @@ assert(shallowArrayResult.rendersAfterSame === shallowArrayResult.rendersAfterFi
 assert(shallowArrayResult.rendersAfterDiff === shallowArrayResult.rendersAfterFirst + 1,
   `Shallow array: different items triggers render`)
 
-// Test 50: Prop set with equivalent plain object skips render
+// Test 39: Prop set with equivalent plain object skips render
 const shallowObjResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
 
@@ -1514,7 +1102,7 @@ assert(shallowObjResult.rendersAfterSame === shallowObjResult.rendersAfterFirst,
 assert(shallowObjResult.rendersAfterDiff === shallowObjResult.rendersAfterFirst + 1,
   `Shallow object: different values triggers render`)
 
-// Test 51: Class instances bypass shallow equality (use strict ===)
+// Test 40: Class instances bypass shallow equality (use strict ===)
 const shallowClassResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
 
@@ -1555,80 +1143,11 @@ const shallowClassResult = await page.evaluate(async () => {
 assert(shallowClassResult.rendersAfterNew === shallowClassResult.rendersAfterFirst + 1,
   `Shallow class: different instances trigger render (not shallow compared)`)
 
-// Test 52: Static state with equivalent array skips render
-const shallowStateResult = await page.evaluate(async () => {
-  const { CoupElement, html } = await import('coup')
-
-  let renderCount = 0
-
-  class ShallowState extends CoupElement {
-    static tag = 'shallow-state'
-    static state = { items: [] }
-    template() {
-      renderCount++
-      return html`<span>${this.items.length}</span>`
-    }
-  }
-  ShallowState.define()
-
-  const el = document.createElement('shallow-state')
-  document.body.appendChild(el)
-  await new Promise(r => setTimeout(r, 50))
-
-  el.items = ['a', 'b', 'c']
-  await new Promise(r => setTimeout(r, 50))
-  const rendersAfterSet = renderCount
-
-  // Same contents — should skip
-  el.items = ['a', 'b', 'c']
-  await new Promise(r => setTimeout(r, 50))
-  const rendersAfterSame = renderCount
-
-  // Different — should render
-  el.items = ['a', 'b']
-  await new Promise(r => setTimeout(r, 50))
-  const rendersAfterDiff = renderCount
-
-  el.remove()
-  return { rendersAfterSet, rendersAfterSame, rendersAfterDiff }
-})
-assert(shallowStateResult.rendersAfterSame === shallowStateResult.rendersAfterSet,
-  `Shallow state array: same items skips render`)
-assert(shallowStateResult.rendersAfterDiff === shallowStateResult.rendersAfterSet + 1,
-  `Shallow state array: different items triggers render`)
-
 // =========================================================================
 // Debug: Object.freeze + reserved name warnings
 // =========================================================================
 
-// Test 53: Debug mode freezes objects/arrays assigned to static state
-const freezeResult = await page.evaluate(async () => {
-  const { CoupElement, html } = await import('coup')
-  CoupElement.debug = true
-
-  class FreezeTest extends CoupElement {
-    static tag = 'freeze-test'
-    static state = { items: [] }
-    template() { return html`<span>${this.items.length}</span>` }
-  }
-  FreezeTest.define()
-
-  const el = document.createElement('freeze-test')
-  document.body.appendChild(el)
-  await new Promise(r => setTimeout(r, 50))
-
-  el.items = ['a', 'b']
-  await new Promise(r => setTimeout(r, 50))
-
-  const frozen = Object.isFrozen(el.items)
-
-  CoupElement.debug = false
-  el.remove()
-  return { frozen }
-})
-assert(freezeResult.frozen === true, 'Debug: Object.freeze freezes static state')
-
-// Test 54: Debug mode freezes objects assigned to props
+// Test 41: Debug mode freezes objects assigned to props
 const freezePropResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
   CoupElement.debug = true
@@ -1655,7 +1174,7 @@ const freezePropResult = await page.evaluate(async () => {
 })
 assert(freezePropResult.frozen === true, 'Debug: Object.freeze freezes props')
 
-// Test 55: Reserved name warning in debug mode
+// Test 42: Reserved prop name warning in debug mode
 const reservedResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
   CoupElement.debug = true
@@ -1664,17 +1183,6 @@ const reservedResult = await page.evaluate(async () => {
   const origWarn = console.warn
   console.warn = (...args) => warnings.push(args.join(' '))
 
-  class ReservedState extends CoupElement {
-    static tag = 'reserved-state'
-    static state = { render: 0 }
-    template() { return html`<span>hi</span>` }
-  }
-  ReservedState.define()
-
-  // Constructor fires during createElement, which runs _setupState
-  try { document.createElement('reserved-state') } catch(e) {}
-
-  // Try with props too
   class ReservedProp extends CoupElement {
     static tag = 'reserved-prop'
     static props = { template: String }
@@ -1685,14 +1193,12 @@ const reservedResult = await page.evaluate(async () => {
   console.warn = origWarn
   CoupElement.debug = false
 
-  const stateWarning = warnings.some(w => w.includes('state "render" shadows'))
   const propWarning = warnings.some(w => w.includes('prop "template" shadows'))
-  return { stateWarning, propWarning, warnings }
+  return { propWarning }
 })
-assert(reservedResult.stateWarning === true, 'Debug: warns on reserved state name')
 assert(reservedResult.propWarning === true, 'Debug: warns on reserved prop name')
 
-// Test 56: Debug mode does NOT freeze class instances (e.g. Tiptap Editor)
+// Test 43: Debug mode does NOT freeze class instances assigned to props
 const freezeClassResult = await page.evaluate(async () => {
   const { CoupElement, html } = await import('coup')
   CoupElement.debug = true
@@ -1703,7 +1209,7 @@ const freezeClassResult = await page.evaluate(async () => {
 
   class EditorHost extends CoupElement {
     static tag = 'editor-host'
-    static state = { editor: null }
+    static props = { editor: Object }
     template() { return html`<span>ok</span>` }
   }
   EditorHost.define()
