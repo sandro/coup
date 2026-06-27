@@ -6,7 +6,7 @@ CoupElement.debug = true
 // data-table — sortable, filterable, paginated, resizable,
 // reorderable country data
 //
-// Demonstrates: static state with multiple interacting filters,
+// Demonstrates: instance state with multiple interacting filters,
 // derived data in template(), debounced search, pointer events
 // for drag interactions, embedded data
 // ============================================================
@@ -33,7 +33,7 @@ function fmtNum(n) {
 class DataTable extends CoupElement {
   static tag = 'data-table'
 
-  static state = {
+  state = {
     search: '',
     region: '',
     sortBy: 0,
@@ -59,62 +59,68 @@ class DataTable extends CoupElement {
     clearTimeout(this.#debounceTimer)
     const value = e.target.value
     this.#debounceTimer = setTimeout(() => {
-      this.search = value
-      this.page = 1
+      this.state.search = value
+      this.state.page = 1
+      this.render()
     }, 200)
   }
 
   onRegion(e) {
-    this.region = e.target.value
-    this.page = 1
+    this.state.region = e.target.value
+    this.state.page = 1
+    this.render()
   }
 
   // --- Column filter ---
 
   onColumnFilter(colKey, e) {
-    this.columnFilters = { ...this.columnFilters, [colKey]: e.target.value }
-    this.page = 1
+    this.state.columnFilters = { ...this.state.columnFilters, [colKey]: e.target.value }
+    this.state.page = 1
+    this.render()
   }
 
   get hasColumnFilters() {
-    return Object.values(this.columnFilters).some(v => v.trim())
+    return Object.values(this.state.columnFilters).some(v => v.trim())
   }
 
   clearColumnFilters() {
-    this.columnFilters = {}
-    this.page = 1
+    this.state.columnFilters = {}
+    this.state.page = 1
+    this.render()
   }
 
   // --- Sort ---
 
   onSort(key) {
-    if (this.sortBy === key) {
-      this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc'
+    if (this.state.sortBy === key) {
+      this.state.sortDir = this.state.sortDir === 'asc' ? 'desc' : 'asc'
     } else {
-      this.sortBy = key
-      this.sortDir = 'asc'
+      this.state.sortBy = key
+      this.state.sortDir = 'asc'
     }
+    this.render()
   }
 
   // --- Pagination ---
 
-  prevPage() { this.page = Math.max(1, this.page - 1) }
-  nextPage(totalPages) { this.page = Math.min(totalPages, this.page + 1) }
+  prevPage() { this.state.page = Math.max(1, this.state.page - 1); this.render() }
+  nextPage(totalPages) { this.state.page = Math.min(totalPages, this.state.page + 1); this.render() }
 
   // --- Column resize ---
 
   onResizeStart(colIndex, e) {
     e.preventDefault()
     e.stopPropagation()
-    const col = this.columns[colIndex]
+    const col = this.state.columns[colIndex]
     this.#resizing = { colIndex, startX: e.clientX, startWidth: col.width }
     const onMove = (ev) => {
       const delta = ev.clientX - this.#resizing.startX
       const newWidth = Math.max(60, this.#resizing.startWidth + delta)
-      const cols = this.columns.map((c, i) =>
+      const cols = this.state.columns.map((c, i) =>
         i === this.#resizing.colIndex ? { ...c, width: newWidth } : c
       )
-      this.columns = cols
+      this.state.columns = cols
+      this.render()
     }
     const onUp = () => {
       this.#resizing = null
@@ -160,10 +166,11 @@ class DataTable extends CoupElement {
     const fromIndex = parseInt(e.dataTransfer.getData('text/plain'))
     if (fromIndex === targetIndex) return
 
-    const cols = [...this.columns]
+    const cols = [...this.state.columns]
     const [moved] = cols.splice(fromIndex, 1)
     cols.splice(targetIndex, 0, moved)
-    this.columns = cols
+    this.state.columns = cols
+    this.render()
   }
 
   // --- Process rows ---
@@ -172,7 +179,7 @@ class DataTable extends CoupElement {
     let rows = COUNTRIES
 
     // Global search
-    const q = this.search.toLowerCase().trim()
+    const q = this.state.search.toLowerCase().trim()
     if (q) {
       rows = rows.filter(r =>
         r[0].toLowerCase().includes(q) ||
@@ -181,12 +188,12 @@ class DataTable extends CoupElement {
     }
 
     // Region dropdown
-    if (this.region) {
-      rows = rows.filter(r => r[2] === this.region)
+    if (this.state.region) {
+      rows = rows.filter(r => r[2] === this.state.region)
     }
 
     // Per-column filters
-    for (const [colKey, filter] of Object.entries(this.columnFilters)) {
+    for (const [colKey, filter] of Object.entries(this.state.columnFilters)) {
       const f = filter.toLowerCase().trim()
       if (!f) continue
       const key = parseInt(colKey)
@@ -198,8 +205,8 @@ class DataTable extends CoupElement {
     }
 
     // Sort
-    const dir = this.sortDir === 'asc' ? 1 : -1
-    const key = this.sortBy
+    const dir = this.state.sortDir === 'asc' ? 1 : -1
+    const key = this.state.sortBy
     rows = [...rows].sort((a, b) => {
       const av = a[key], bv = b[key]
       if (typeof av === 'number') return (av - bv) * dir
@@ -208,7 +215,7 @@ class DataTable extends CoupElement {
 
     const totalRows = rows.length
     const totalPages = Math.max(1, Math.ceil(totalRows / PER_PAGE))
-    const page = Math.min(this.page, totalPages)
+    const page = Math.min(this.state.page, totalPages)
     const start = (page - 1) * PER_PAGE
     const pageRows = rows.slice(start, start + PER_PAGE)
 
@@ -219,16 +226,16 @@ class DataTable extends CoupElement {
 
   template() {
     const { pageRows, totalRows, totalPages, page, start } = this.#processRows()
-    const cols = this.columns
+    const cols = this.state.columns
 
     return html`
       <div class="controls">
         <input type="text" placeholder="Search countries or capitals…"
-          .value=${this.search} @input=${(e) => this.onSearch(e)}>
+          .value=${this.state.search} @input=${(e) => this.onSearch(e)}>
         <select @change=${(e) => this.onRegion(e)}>
           <option value="">All Regions</option>
           ${REGIONS.map(r => html`
-            <option value=${r} ?selected=${r === this.region}>${r}</option>
+            <option value=${r} ?selected=${r === this.state.region}>${r}</option>
           `)}
         </select>
         ${this.hasColumnFilters ? html`
@@ -254,8 +261,8 @@ class DataTable extends CoupElement {
                     @dragover=${(e) => this.onDragOver(i, e)}
                     @dragend=${(e) => this.onDragEnd(e)}
                     @drop=${(e) => this.onDrop(i, e)}>
-                  <span class="th-label">${col.label}${this.sortBy === col.key
-                    ? html`<span class="sort-arrow">${this.sortDir === 'asc' ? '▲' : '▼'}</span>`
+                  <span class="th-label">${col.label}${this.state.sortBy === col.key
+                    ? html`<span class="sort-arrow">${this.state.sortDir === 'asc' ? '▲' : '▼'}</span>`
                     : nothing}</span>
                   <span class="resize-handle"
                     @pointerdown=${(e) => this.onResizeStart(i, e)}></span>
@@ -268,7 +275,7 @@ class DataTable extends CoupElement {
                 <th>
                   <input type="text" class="col-filter"
                     placeholder="Filter…"
-                    .value=${this.columnFilters[col.key] || ''}
+                    .value=${this.state.columnFilters[col.key] || ''}
                     @input=${(e) => this.onColumnFilter(col.key, e)}
                     @click=${(e) => e.stopPropagation()}>
                 </th>

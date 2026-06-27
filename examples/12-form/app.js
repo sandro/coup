@@ -24,7 +24,7 @@ const email = (v) => {
 }
 
 const matchesField = (field, label) => function(v) {
-  return v === this[field] ? '' : `${label} must match`
+  return v === this.state[field] ? '' : `${label} must match`
 }
 
 // --- Field definitions ---
@@ -41,7 +41,7 @@ const FIELDS = [
 class SignupForm extends CoupElement {
   static tag = 'signup-form'
 
-  static state = {
+  state = {
     // Field values
     name: '',
     email: '',
@@ -62,7 +62,7 @@ class SignupForm extends CoupElement {
   // --- Validation ---
 
   validateField(field) {
-    const value = this[field.name]
+    const value = this.state[field.name]
     for (const fn of field.validators) {
       const err = fn.call(this, value)
       if (err) return err
@@ -80,92 +80,100 @@ class SignupForm extends CoupElement {
         valid = false
       }
     }
-    this.errors = errors
+    this.state.errors = errors
+    this.render()
     return valid
   }
 
   // --- Handlers ---
 
   onInput(fieldName, e) {
-    this[fieldName] = e.target.value
+    this.state[fieldName] = e.target.value
 
     // Live-validate if already touched or submitted
-    if (this.touched[fieldName] || this.submitted) {
+    if (this.state.touched[fieldName] || this.state.submitted) {
       const field = FIELDS.find(f => f.name === fieldName)
       const err = this.validateField(field)
-      this.errors = { ...this.errors, [fieldName]: err }
+      this.state.errors = { ...this.state.errors, [fieldName]: err }
     }
 
     // Re-validate confirm when password changes
-    if (fieldName === 'password' && (this.touched.confirm || this.submitted)) {
+    if (fieldName === 'password' && (this.state.touched.confirm || this.state.submitted)) {
       const confirmField = FIELDS.find(f => f.name === 'confirm')
       const err = this.validateField(confirmField)
-      this.errors = { ...this.errors, confirm: err }
+      this.state.errors = { ...this.state.errors, confirm: err }
     }
+
+    this.render()
   }
 
   onBlur(fieldName) {
-    this.touched = { ...this.touched, [fieldName]: true }
+    this.state.touched = { ...this.state.touched, [fieldName]: true }
     const field = FIELDS.find(f => f.name === fieldName)
     const err = this.validateField(field)
-    this.errors = { ...this.errors, [fieldName]: err }
+    this.state.errors = { ...this.state.errors, [fieldName]: err }
+    this.render()
   }
 
   async onSubmit(e) {
     e.preventDefault()
-    this.submitted = true
-    this.result = ''
+    this.state.submitted = true
+    this.state.result = ''
 
     // Mark all touched
     const allTouched = {}
     for (const f of FIELDS) allTouched[f.name] = true
-    this.touched = allTouched
+    this.state.touched = allTouched
+    this.render()
 
     if (!this.validateAll()) return
 
     // Simulate async submit
-    this.submitting = true
+    this.state.submitting = true
+    this.render()
     try {
       await new Promise((resolve, reject) => {
         setTimeout(() => {
           // Simulate server-side email conflict
-          if (this.email === 'taken@example.com') {
+          if (this.state.email === 'taken@example.com') {
             reject(new Error('An account with this email already exists'))
           } else {
             resolve()
           }
         }, 1500)
       })
-      this.result = 'success'
-      this.resultMessage = `Account created for ${this.name}!`
+      this.state.result = 'success'
+      this.state.resultMessage = `Account created for ${this.state.name}!`
     } catch (err) {
-      this.result = 'error'
-      this.resultMessage = err.message
+      this.state.result = 'error'
+      this.state.resultMessage = err.message
     } finally {
-      this.submitting = false
+      this.state.submitting = false
+      this.render()
     }
   }
 
   onReset() {
-    this.name = ''
-    this.email = ''
-    this.password = ''
-    this.confirm = ''
-    this.touched = {}
-    this.errors = {}
-    this.submitted = false
-    this.result = ''
-    this.resultMessage = ''
+    this.state.name = ''
+    this.state.email = ''
+    this.state.password = ''
+    this.state.confirm = ''
+    this.state.touched = {}
+    this.state.errors = {}
+    this.state.submitted = false
+    this.state.result = ''
+    this.state.resultMessage = ''
+    this.render()
   }
 
   // --- Derived ---
 
   get isDirty() {
-    return FIELDS.some(f => this[f.name] !== '')
+    return FIELDS.some(f => this.state[f.name] !== '')
   }
 
   get hasErrors() {
-    return Object.values(this.errors).some(e => e)
+    return Object.values(this.state.errors).some(e => e)
   }
 
   // --- Password strength ---
@@ -193,43 +201,43 @@ class SignupForm extends CoupElement {
   // --- Template ---
 
   template() {
-    if (this.result === 'success') {
+    if (this.state.result === 'success') {
       return html`
         <div class="success-card">
           <div class="success-icon">✓</div>
-          <h2>${this.resultMessage}</h2>
+          <h2>${this.state.resultMessage}</h2>
           <p>Check your email to verify your account.</p>
           <button @click=${() => this.onReset()}>Create another</button>
         </div>
       `
     }
 
-    const strength = this.passwordStrength(this.password)
+    const strength = this.passwordStrength(this.state.password)
 
     return html`
       <form @submit=${(e) => this.onSubmit(e)} novalidate>
         <h2>Create Account</h2>
 
-        ${this.result === 'error' ? html`
-          <div class="alert error">${this.resultMessage}</div>
+        ${this.state.result === 'error' ? html`
+          <div class="alert error">${this.state.resultMessage}</div>
         ` : nothing}
 
         ${FIELDS.map(field => {
-          const err = this.errors[field.name]
-          const show = err && (this.touched[field.name] || this.submitted)
+          const err = this.state.errors[field.name]
+          const show = err && (this.state.touched[field.name] || this.state.submitted)
           return html`
             <div class="field ${show ? 'invalid' : ''}">
               <label for=${field.name}>${field.label}</label>
               <input
                 id=${field.name}
                 type=${field.type}
-                .value=${this[field.name]}
+                .value=${this.state[field.name]}
                 @input=${(e) => this.onInput(field.name, e)}
                 @blur=${() => this.onBlur(field.name)}
-                ?disabled=${this.submitting}
+                ?disabled=${this.state.submitting}
                 autocomplete=${field.name === 'confirm' ? 'new-password' : field.name}
               >
-              ${field.name === 'password' && this.password ? html`
+              ${field.name === 'password' && this.state.password ? html`
                 <div class="strength">
                   <div class="strength-bar">
                     ${[1,2,3,4,5].map(i => html`
@@ -246,10 +254,10 @@ class SignupForm extends CoupElement {
         })}
 
         <div class="actions">
-          <button type="submit" ?disabled=${this.submitting}>
-            ${this.submitting ? html`<span class="spinner"></span> Creating…` : 'Create Account'}
+          <button type="submit" ?disabled=${this.state.submitting}>
+            ${this.state.submitting ? html`<span class="spinner"></span> Creating…` : 'Create Account'}
           </button>
-          ${this.isDirty && !this.submitting ? html`
+          ${this.isDirty && !this.state.submitting ? html`
             <button type="button" class="secondary" @click=${() => this.onReset()}>Reset</button>
           ` : nothing}
         </div>
