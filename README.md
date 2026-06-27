@@ -16,7 +16,7 @@ You don't need a build step. You don't need a virtual DOM. You don't need hooks,
 │  render()    → applies template to   │
 │                DOM via lit-html      │
 │  static props  → auto-render on set  │
-│  static state  → reactive internals  │
+│  state = {}    → manual this.render() │
 │  static events → window listeners    │
 │  static subscribe → store bindings   │
 │  emit()      → dispatch CustomEvent  │
@@ -46,12 +46,12 @@ import { CoupElement, html } from 'coup'
 
 class MyCounter extends CoupElement {
   static tag = 'my-counter'
-  static state = { count: 0 }
+  state = { count: 0 }
 
   template() {
     return html`
-      <button @click=${() => this.count++}>
-        Clicked ${this.count} times
+      <button @click=${() => { this.state.count++; this.render() }}>
+        Clicked ${this.state.count} times
       </button>
     `
   }
@@ -59,7 +59,7 @@ class MyCounter extends CoupElement {
 MyCounter.define()
 ```
 
-Set `this.count` and it re-renders. No manual `render()` call needed — but you *can* call it when you want full control. Both paths are always available.
+Mutate `this.state`, call `this.render()`. Props auto-render when set by a parent — internal state is always explicit.
 
 ### Standalone bundle (single import, no importmap)
 
@@ -70,12 +70,12 @@ Set `this.count` and it re-renders. No manual `render()` call needed — but you
 
   class MyCounter extends CoupElement {
     static tag = 'my-counter'
-    static state = { count: 0 }
+    state = { count: 0 }
 
     template() {
       return html`
-        <button @click=${() => this.count++}>
-          Clicked ${this.count} times
+        <button @click=${() => { this.state.count++; this.render() }}>
+          Clicked ${this.state.count} times
         </button>
       `
     }
@@ -147,7 +147,7 @@ template() {
 
 ### `render()`
 
-Call `this.render()` to manually trigger a re-render. With `static state`, rendering is automatic — but `render()` is always there when you need it (e.g., after mutating manual `this.state` objects, or after async operations).
+Call `this.render()` to manually trigger a re-render. Props auto-render. For internal state, call `this.render()` explicitly.
 
 ```js
 onClick() {
@@ -195,60 +195,36 @@ Object.defineProperty(this, 'user', {
 
 Multiple prop changes in the same microtask coalesce into a single render.
 
-### `static state`
+### State
 
-Declares reactive internal state. Same mechanism as `static props` — `Object.defineProperty` getters/setters with `queueMicrotask` batching. No proxies.
+Internal component state. Use a plain instance property — read from `this.state`, write to it, and call `this.render()` when you want the DOM to update.
 
 ```js
 class SearchBox extends CoupElement {
   static tag = 'search-box'
-  static state = { query: '', results: [], loading: false }
+  state = { query: '', results: [], loading: false }
 
   async search(q) {
-    this.query = q           // auto-renders
-    this.loading = true      // coalesces with above — one render
-    this.results = await fetchResults(q)
-    this.loading = false     // one more render
+    this.state.query = q
+    this.state.loading = true
+    this.render()
+    this.state.results = await fetchResults(q)
+    this.state.loading = false
+    this.render()
   }
 
   template() {
     return html`
-      <input @input=${e => this.search(e.target.value)} .value=${this.query}>
-      ${this.loading
+      <input @input=${e => { this.state.query = e.target.value; this.render() }}
+             .value=${this.state.query}>
+      ${this.state.loading
         ? html`<p>Loading...</p>`
-        : html`<ul>${this.results.map(r => html`<li>${r}</li>`)}</ul>`
+        : html`<ul>${this.state.results.map(r => html`<li>${r}</li>`)}</ul>`
       }
     `
   }
 }
 ```
-
-**Three declaration forms:**
-
-```js
-// Defaults — each key gets its initial value
-static state = { count: 0, label: 'ready' }
-
-// Types — initialized to undefined (like props)
-static state = { count: Number, label: String }
-
-// Array — all undefined
-static state = ['count', 'label']
-```
-
-Access state directly on `this` — it's `this.count`, not `this.state.count`.
-
-**Important:** Object mutation does NOT trigger a re-render. The setter uses strict equality (`!==`), so you must assign a new reference:
-
-```js
-// ❌ Won't re-render — same reference
-this.items.push(newItem)
-
-// ✅ New array — triggers re-render
-this.items = [...this.items, newItem]
-```
-
-**Coexists with manual state.** You can still use `this.state = {}` + `this.render()` in the same project — or even the same component. `static state` is the convenience path; manual render is the power path.
 
 ### `static attrs`
 
@@ -318,14 +294,16 @@ class PlayerControls extends CoupElement {
     'app:theme-changed': 'onThemeChanged',
   }
 
-  static state = { track: null, theme: 'light' }
+  state = { track: null, theme: 'light' }
 
   onPlayerState(e) {
-    this.track = e.detail.track
+    this.state.track = e.detail.track
+    this.render()
   }
 
   onThemeChanged(e) {
-    this.theme = e.detail
+    this.state.theme = e.detail
+    this.render()
   }
 }
 ```
@@ -341,10 +319,11 @@ this.emit('tasks:remove', { id: 42 })
 // Parent listens:
 class TaskList extends CoupElement {
   static events = { 'tasks:remove': 'onRemove' }
-  static state = { tasks: [] }
+  state = { tasks: [] }
 
   onRemove(e) {
-    this.tasks = this.tasks.filter(t => t.id !== e.detail.id)
+    this.state.tasks = this.state.tasks.filter(t => t.id !== e.detail.id)
+    this.render()
   }
 }
 ```
@@ -387,7 +366,6 @@ disconnected() { this._unsub() }
 | `updated()` | After every render (DOM is up to date) |
 | `disconnected()` | Element removed from DOM |
 | `propsChanged(changes)` | After props change. Batched — fires once per microtask with `{ name: { old, new } }` |
-| `stateChanged(changes)` | After static state changes. Batched — fires once per microtask with `{ name: { old, new } }` |
 | `storeChanged(store, state)` | When a subscribed store updates. If defined, auto-render is skipped — you call `this.render()` when ready. |
 
 No need to call `super` — coup handles that internally.
@@ -502,8 +480,7 @@ export const playlistStore = new Store({ playlists: [], active: null })
 
 | Pattern | Use when |
 |---|---|
-| `static state` | State is local to one component and you want auto-rendering |
-| `this.state` + `this.render()` | You want full control over when rendering happens |
+| `this.state` + `this.render()` | State is local to one component |
 | `static events` + `emit()` | Child needs to notify parent (or any ancestor) |
 | `Store` + `static subscribe` | Multiple unrelated components need the same data |
 
@@ -576,10 +553,10 @@ import { repeat } from 'lit-html/directives/repeat.js'
 
 class TodoList extends CoupElement {
   static tag = 'todo-list'
-  static state = { items: [] }
+  state = { items: [] }
 
   connected() {
-    this.items = [
+    this.state.items = [
       { id: 1, text: 'First' },
       { id: 2, text: 'Second' },
     ]
@@ -589,7 +566,7 @@ class TodoList extends CoupElement {
     return html`
       <ul>
         ${repeat(
-          this.items,
+          this.state.items,
           item => item.id,       // key function
           item => html`<li>${item.text}</li>`  // template function
         )}
@@ -615,7 +592,7 @@ See the full list: [lit-html built-in directives](https://lit.dev/docs/templates
 
 ## Complete Example
 
-A parent/child component pair using props, static state, events, and keyed lists:
+A parent/child component pair using props, state, events, and keyed lists:
 
 ```js
 import { CoupElement, html } from 'coup'
@@ -656,7 +633,7 @@ class TaskApp extends CoupElement {
     'tasks:toggle': 'onToggle',
     'tasks:remove': 'onRemove',
   }
-  static state = {
+  state = {
     tasks: [
       { id: 1, name: 'Read coup source', done: false },
       { id: 2, name: 'Build a component', done: true },
@@ -664,23 +641,25 @@ class TaskApp extends CoupElement {
   }
 
   onToggle(e) {
-    this.tasks = this.tasks.map(t =>
+    this.state.tasks = this.state.tasks.map(t =>
       t.id === e.detail.id ? { ...t, done: !t.done } : t
     )
+    this.render()
   }
 
   onRemove(e) {
-    this.tasks = this.tasks.filter(t => t.id !== e.detail.id)
+    this.state.tasks = this.state.tasks.filter(t => t.id !== e.detail.id)
+    this.render()
   }
 
   template() {
     return html`
       ${repeat(
-        this.tasks,
+        this.state.tasks,
         t => t.id,
         t => html`<task-item .task=${t}></task-item>`
       )}
-      <p>${this.tasks.filter(t => t.done).length} done</p>
+      <p>${this.state.tasks.filter(t => t.done).length} done</p>
     `
   }
 }
@@ -749,7 +728,7 @@ class TaskItem extends CoupElement {
 
 ### 2. Object mutation doesn't trigger re-renders
 
-Props and static state both use strict equality (`!==`) for change detection. Mutating an object in place won't trigger a re-render because the reference hasn't changed.
+Props use strict equality (`!==`) for change detection. Mutating an object in place won't trigger a re-render because the reference hasn't changed.
 
 ```js
 // ❌ WRONG — same reference, setter doesn't fire
@@ -772,7 +751,7 @@ this.tasks = this.tasks.map(t =>
 )
 ```
 
-**When is mutation OK?** With manual state — mutate `this.state.items`, then call `this.render()` yourself. The auto-render system only applies to `static props` and `static state`.
+Mutate `this.state.items`, then call `this.render()`. Auto-rendering only applies to `static props`.
 
 ### 3. Use `connected()` / `disconnected()`, not raw lifecycle hooks
 
@@ -896,8 +875,7 @@ Runs a headless Playwright test suite covering rendering, adding, removing, reor
 | Decision | Rationale |
 |---|---|
 | **No shadow DOM** | Global CSS just works. No slots, no style encapsulation headaches. |
-| **`static state` auto-renders** | Convenience path — set a value, UI updates. Same `Object.defineProperty` + `queueMicrotask` batching as props. No proxies. |
-| **Manual `this.state` + `render()` still works** | Power path — full control over when rendering happens. Both patterns coexist. |
+| **Manual `this.state` + `render()`** | State management — set properties on `this.state`, call `this.render()`. |
 | **Auto-render on prop changes** | Props come from a parent — the parent is saying "your inputs changed." |
 | **`template()` vs `render()`** | Separating definition from trigger prevents accidental recursion. |
 | **Global events via `window`** | Simple pub/sub. No event bus library. Auto-cleanup on disconnect. |
