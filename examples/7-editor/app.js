@@ -478,7 +478,7 @@ class BlockEditor extends CoupElement {
     'code:changed': 'onCodeChanged',
   }
 
-  static state = {
+  state = {
     mode: 'split',       // 'write' | 'split' | 'code'
     htmlContent: '',     // current HTML string for code view
   }
@@ -506,12 +506,14 @@ class BlockEditor extends CoupElement {
       onUpdate: ({ editor }) => {
         if (this._suppressUpdate) return
         // Tiptap → code view sync
-        this.htmlContent = editor.getHTML()
+        this.state.htmlContent = editor.getHTML()
+        this.render()
       },
     })
 
     this._editor = editor
-    this.htmlContent = editor.getHTML()
+    this.state.htmlContent = editor.getHTML()
+    this.render()
   }
 
   disconnected() {
@@ -530,7 +532,8 @@ class BlockEditor extends CoupElement {
   }
 
   onModeChange(e) {
-    this.mode = e.detail
+    this.state.mode = e.detail
+    this.render()
   }
 
   onCodeChanged(e) {
@@ -544,13 +547,14 @@ class BlockEditor extends CoupElement {
       // Temporarily suppress Tiptap's onUpdate to prevent bounce-back
       this._suppressUpdate = true
       this._editor.commands.setContent(newHTML, false)
-      this.htmlContent = newHTML
+      this.state.htmlContent = newHTML
       this._suppressUpdate = false
+      this.render()
     }
   }
 
   template() {
-    const { mode, htmlContent } = this
+    const { mode, htmlContent } = this.state
     const editor = this._editor
     const showWysiwyg = mode === 'write' || mode === 'split'
     const showCode = mode === 'split' || mode === 'code'

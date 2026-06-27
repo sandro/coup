@@ -100,7 +100,7 @@ class CoupChatbot extends CoupElement {
     'chatbot:append-message': 'onAppendMessage',
   }
 
-  static state = {
+  state = {
     messages: [],
     inputHistory: [],
     historyIndex: -1,
@@ -123,7 +123,7 @@ class CoupChatbot extends CoupElement {
       const el = this.$('.cb-messages')
       if (!el) return
       const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40
-      this.userHasScrolled = !atBottom
+      this.state.userHasScrolled = !atBottom
     }
 
     // Paste images from clipboard
@@ -160,7 +160,7 @@ class CoupChatbot extends CoupElement {
   updated() {
     // Autoscroll only if user hasn't scrolled up
     const el = this.$('.cb-messages')
-    if (el && !this.userHasScrolled) {
+    if (el && !this.state.userHasScrolled) {
       el.scrollTop = el.scrollHeight
     }
   }
@@ -168,15 +168,16 @@ class CoupChatbot extends CoupElement {
   // ── Input handling ──
 
   onInput(e) {
-    this.currentInput = e.target.value
+    this.state.currentInput = e.target.value
     this._autoResize(e.target)
+    this.render()
   }
 
   onKeyDown(e) {
     const textarea = e.target
 
     // Escape to stop streaming
-    if (e.key === 'Escape' && this.sending) {
+    if (e.key === 'Escape' && this.state.sending) {
       e.preventDefault()
       this._abortStream()
       return
@@ -210,14 +211,14 @@ class CoupChatbot extends CoupElement {
   }
 
   _navigateHistory(direction) {
-    const { inputHistory, historyIndex } = this
+    const { inputHistory, historyIndex } = this.state
     if (inputHistory.length === 0) return
 
     let newIndex = historyIndex + direction
 
     // Going down past the end restores current input
     if (newIndex > inputHistory.length - 1) {
-      this.historyIndex = -1
+      this.state.historyIndex = -1
       this._setInput(this._savedInput || '')
       return
     }
@@ -226,10 +227,10 @@ class CoupChatbot extends CoupElement {
 
     // Save current input when first pressing up
     if (historyIndex === -1) {
-      this._savedInput = this.currentInput
+      this._savedInput = this.state.currentInput
     }
 
-    this.historyIndex = newIndex
+    this.state.historyIndex = newIndex
     // History is newest-first
     this._setInput(inputHistory[inputHistory.length - 1 - newIndex])
   }
@@ -238,8 +239,9 @@ class CoupChatbot extends CoupElement {
     const textarea = this.$('textarea')
     if (!textarea) return
     textarea.value = text
-    this.currentInput = text
+    this.state.currentInput = text
     this._autoResize(textarea)
+    this.render()
   }
 
   _autoResize(textarea) {
@@ -253,7 +255,8 @@ class CoupChatbot extends CoupElement {
   onDragEnter(e) {
     e.preventDefault()
     this._dragCounter++
-    this.dragOver = true
+    this.state.dragOver = true
+    this.render()
   }
 
   onDragOver(e) {
@@ -265,15 +268,17 @@ class CoupChatbot extends CoupElement {
     this._dragCounter--
     if (this._dragCounter <= 0) {
       this._dragCounter = 0
-      this.dragOver = false
+      this.state.dragOver = false
+      this.render()
     }
   }
 
   onDrop(e) {
     e.preventDefault()
     e.stopPropagation()
-    this.dragOver = false
+    this.state.dragOver = false
     this._dragCounter = 0
+    this.render()
 
     if (e.dataTransfer?.files?.length) {
       this._processFiles(Array.from(e.dataTransfer.files))
@@ -292,17 +297,19 @@ class CoupChatbot extends CoupElement {
 
       const reader = new FileReader()
       reader.onload = (e) => {
-        this.pendingFiles = [
-          ...this.pendingFiles,
+        this.state.pendingFiles = [
+          ...this.state.pendingFiles,
           { name: file.name, url: e.target.result, file }
         ]
+        this.render()
       }
       reader.readAsDataURL(file)
     }
   }
 
   removePendingFile(index) {
-    this.pendingFiles = this.pendingFiles.filter((_, i) => i !== index)
+    this.state.pendingFiles = this.state.pendingFiles.filter((_, i) => i !== index)
+    this.render()
   }
 
   // ── Abort ──
@@ -312,26 +319,27 @@ class CoupChatbot extends CoupElement {
       this._abortController.abort()
       this._abortController = null
     }
-    this.sending = false
+    this.state.sending = false
 
     // Mark the last assistant message as done
-    const msgs = this.messages
+    const msgs = this.state.messages
     const last = msgs[msgs.length - 1]
     if (last?.streaming) {
       last.streaming = false
       last.content += ' [stopped]'
-      this.messages = [...msgs]
+      this.state.messages = [...msgs]
     }
+    this.render()
   }
 
   // ── Send ──
 
   async send() {
-    const text = this.currentInput.trim()
-    const files = this.pendingFiles
+    const text = this.state.currentInput.trim()
+    const files = this.state.pendingFiles
 
     if (!text && files.length === 0) return
-    if (this.sending) return
+    if (this.state.sending) return
 
     // Add user message
     const userMsg = {
@@ -340,19 +348,20 @@ class CoupChatbot extends CoupElement {
       content: text,
       images: files.map(f => ({ name: f.name, url: f.url })),
     }
-    this.messages = [...this.messages, userMsg]
+    this.state.messages = [...this.state.messages, userMsg]
 
     // Update input history (newest first, matches yap)
     if (text) {
-      this.inputHistory = [...this.inputHistory, text]
+      this.state.inputHistory = [...this.state.inputHistory, text]
     }
 
     // Reset input state
-    this.currentInput = ''
-    this.historyIndex = -1
-    this.pendingFiles = []
-    this.userHasScrolled = false
-    this.sending = true
+    this.state.currentInput = ''
+    this.state.historyIndex = -1
+    this.state.pendingFiles = []
+    this.state.userHasScrolled = false
+    this.state.sending = true
+    this.render()
 
     this._setInput('')
     this.$('.cb-compose textarea')?.focus()
@@ -366,7 +375,8 @@ class CoupChatbot extends CoupElement {
       content: '',
       streaming: true,
     }
-    this.messages = [...this.messages, assistantMsg]
+    this.state.messages = [...this.state.messages, assistantMsg]
+    this.render()
 
     try {
       await this._callEndpoint(text, files, assistantMsg)
@@ -377,11 +387,13 @@ class CoupChatbot extends CoupElement {
       }
       assistantMsg.content = `Error: ${err.message}`
       assistantMsg.streaming = false
-      this.messages = [...this.messages]
+      this.state.messages = [...this.state.messages]
       this.emit('chatbot:error', { error: err })
+      this.render()
     } finally {
-      this.sending = false
+      this.state.sending = false
       this._abortController = null
+      this.render()
     }
   }
 
@@ -394,7 +406,7 @@ class CoupChatbot extends CoupElement {
     }
 
     const body = {
-      messages: this.messages
+      messages: this.state.messages
         .filter(m => !m.streaming)
         .map(m => ({ role: m.role, content: m.content })),
     }
@@ -431,18 +443,21 @@ class CoupChatbot extends CoupElement {
       const data = await res.json()
       assistantMsg.content = data.content || data.message || data.text || JSON.stringify(data)
       assistantMsg.streaming = false
-      this.messages = [...this.messages]
+      this.state.messages = [...this.state.messages]
       this.emit('chatbot:response', { message: assistantMsg.content })
+      this.render()
     }
   }
 
   // Throttle renders during streaming (from yap: ~80ms debounce)
   _throttledStreamRender() {
     if (!this._streamRenderTimer) {
-      this.messages = [...this.messages]
+      this.state.messages = [...this.state.messages]
+      this.render()
       this._streamRenderTimer = setTimeout(() => {
         this._streamRenderTimer = null
-        this.messages = [...this.messages]
+        this.state.messages = [...this.state.messages]
+        this.render()
       }, 80)
     }
   }
@@ -492,33 +507,36 @@ class CoupChatbot extends CoupElement {
     clearTimeout(this._streamRenderTimer)
     this._streamRenderTimer = null
     assistantMsg.streaming = false
-    this.messages = [...this.messages]
+    this.state.messages = [...this.state.messages]
     this.emit('chatbot:response', { message: assistantMsg.content })
+    this.render()
   }
 
   // ── External message injection ──
 
   onAppendMessage(e) {
     const { role, content } = e.detail
-    this.messages = [
-      ...this.messages,
+    this.state.messages = [
+      ...this.state.messages,
       { id: ++msgId, role, content },
     ]
-    this.userHasScrolled = false
+    this.state.userHasScrolled = false
+    this.render()
   }
 
   // ── Clear conversation ──
 
   clearChat() {
-    this.messages = []
-    this.inputHistory = []
-    this.historyIndex = -1
+    this.state.messages = []
+    this.state.inputHistory = []
+    this.state.historyIndex = -1
+    this.render()
   }
 
   // ── Template ──
 
   template() {
-    const { messages, dragOver, pendingFiles, sending } = this
+    const { messages, dragOver, pendingFiles, sending } = this.state
     const placeholder = this.placeholder || 'Type a message…'
 
     return html`
@@ -573,7 +591,7 @@ class CoupChatbot extends CoupElement {
             </button>
           ` : html`
             <button class="cb-send" @click=${() => this.send()}
-              ?disabled=${!this.currentInput.trim() && pendingFiles.length === 0}>
+              ?disabled=${!this.state.currentInput.trim() && pendingFiles.length === 0}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
               </svg>
