@@ -49,7 +49,7 @@ TaskItem.define()
 
 // ============================================================
 // task-app: owns the data, listens for child events
-// Demonstrates: static state for reactive state, repeat() with keys,
+// Demonstrates: repeat() with keys,
 //   static events for child-to-parent communication, reordering
 // ============================================================
 let nextId = 4
@@ -69,64 +69,72 @@ class TaskApp extends CoupElement {
     'tasks:move': 'onMove',
   }
 
-  static state = {
+  state = {
     tasks: [...INITIAL_TASKS],
     newTaskName: '',
   }
 
   onToggle(e) {
-    this.tasks = this.tasks.map(t =>
+    this.state.tasks = this.state.tasks.map(t =>
       t.id === e.detail.id ? { ...t, done: !t.done } : t
     )
+    this.render()
   }
 
   onRemove(e) {
-    this.tasks = this.tasks.filter(t => t.id !== e.detail.id)
+    this.state.tasks = this.state.tasks.filter(t => t.id !== e.detail.id)
+    this.render()
   }
 
   onMove(e) {
     const { id, direction } = e.detail
-    const tasks = [...this.tasks]
+    const tasks = [...this.state.tasks]
     const idx = tasks.findIndex(t => t.id === id)
     const newIdx = idx + direction
     if (newIdx < 0 || newIdx >= tasks.length) return
 
     // Swap
     ;[tasks[idx], tasks[newIdx]] = [tasks[newIdx], tasks[idx]]
-    this.tasks = tasks
+    this.state.tasks = tasks
+    this.render()
   }
 
   addTask(e) {
     e.preventDefault()
-    const name = this.newTaskName.trim()
+    const name = this.state.newTaskName.trim()
     if (!name) return
-    this.tasks = [...this.tasks, { id: nextId++, name, done: false }]
-    this.newTaskName = ''
+    this.state.tasks = [...this.state.tasks, { id: nextId++, name, done: false }]
+    this.state.newTaskName = ''
+    this.render()
   }
 
   onInput(e) {
-    this.newTaskName = e.target.value
+    this.state.newTaskName = e.target.value
+    this.render()
   }
 
   selectAll() {
-    this.tasks = this.tasks.map(t => ({ ...t, done: true }))
+    this.state.tasks = this.state.tasks.map(t => ({ ...t, done: true }))
+    this.render()
   }
 
   reverse() {
-    this.tasks = [...this.tasks].reverse()
+    this.state.tasks = [...this.state.tasks].reverse()
+    this.render()
   }
 
   shuffle() {
-    const tasks = [...this.tasks]
+    const tasks = [...this.state.tasks]
     for (let i = tasks.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
       ;[tasks[i], tasks[j]] = [tasks[j], tasks[i]]
     }
-    this.tasks = tasks
+    this.state.tasks = tasks
+    this.render()
   }
 
   get doneCount() {
-    return this.tasks.filter(t => t.done).length
+    return this.state.tasks.filter(t => t.done).length
   }
 
   template() {
@@ -135,7 +143,7 @@ class TaskApp extends CoupElement {
         <input
           type="text"
           placeholder="Add a task…"
-          .value=${this.newTaskName}
+          .value=${this.state.newTaskName}
           @input=${(e) => this.onInput(e)}
         />
         <button type="submit">Add</button>
@@ -148,13 +156,13 @@ class TaskApp extends CoupElement {
       </div>
 
       ${repeat(
-        this.tasks,
+        this.state.tasks,
         t => t.id,
         t => html`<task-item .task=${t}></task-item>`
       )}
 
       <div class="status-bar">
-        ${this.doneCount} of ${this.tasks.length} tasks done
+        ${this.doneCount} of ${this.state.tasks.length} tasks done
       </div>
     `
   }

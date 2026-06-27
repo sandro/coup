@@ -74,16 +74,18 @@ class ChatRoom extends CoupElement {
   static tag = 'chat-room'
   static props = { room: String, messages: Array, currentUser: String }
 
-  static state = { typing: null }
+  state = { typing: null }
 
   connected() {
     this._onTyping = (e) => {
       if (e.detail.room !== this.room) return
-      this.typing = e.detail.author
+      this.state.typing = e.detail.author
+      this.render()
     }
     this._onTypingDone = (e) => {
       if (e.detail.room !== this.room) return
-      this.typing = null
+      this.state.typing = null
+      this.render()
     }
     window.addEventListener('chat:typing', this._onTyping)
     window.addEventListener('chat:typing-done', this._onTypingDone)
@@ -124,8 +126,8 @@ class ChatRoom extends CoupElement {
         )}
       </div>
 
-      ${this.typing
-        ? html`<div class="typing">${this.typing} is typing…</div>`
+      ${this.state.typing
+        ? html`<div class="typing">${this.state.typing} is typing…</div>`
         : ''}
 
       <form class="compose" @submit=${(e) => this.sendMessage(e)}>
@@ -149,7 +151,7 @@ class ChatApp extends CoupElement {
     'chat:send': 'onSend',
   }
 
-  static state = {
+  state = {
     user: 'you',
     messages: {
       general: [
@@ -207,10 +209,11 @@ class ChatApp extends CoupElement {
         time: timestamp(),
         system: false,
       }
-      this.messages = {
-        ...this.messages,
-        [room]: [...this.messages[room], msg],
+      this.state.messages = {
+        ...this.state.messages,
+        [room]: [...this.state.messages[room], msg],
       }
+      this.render()
     }, 1500)
   }
 
@@ -218,20 +221,24 @@ class ChatApp extends CoupElement {
     const { room, text } = e.detail
     const msg = {
       id: msgId++,
-      author: this.user,
+      author: this.state.user,
       text,
       time: timestamp(),
       system: false,
     }
-    this.messages = {
-      ...this.messages,
-      [room]: [...this.messages[room], msg],
+    this.state.messages = {
+      ...this.state.messages,
+      [room]: [...this.state.messages[room], msg],
     }
+    this.render()
   }
 
   changeUser(e) {
     const name = e.target.value.trim()
-    if (name) this.user = name
+    if (name) {
+      this.state.user = name
+      this.render()
+    }
   }
 
   template() {
@@ -246,7 +253,7 @@ class ChatApp extends CoupElement {
       `
     }
 
-    const roomMsgs = this.messages[activeRoom] || []
+    const roomMsgs = this.state.messages[activeRoom] || []
 
     return html`
       <div class="sidebar">
@@ -257,13 +264,13 @@ class ChatApp extends CoupElement {
             href="#/${room}"
           >
             # ${room}
-            ${this.messages[room]?.length ? html`<span>(${this.messages[room].length})</span>` : ''}
+            ${this.state.messages[room]?.length ? html`<span>(${this.state.messages[room].length})</span>` : ''}
           </a>
         `)}
         <div class="user-label">
           <input
             type="text"
-            .value=${this.user}
+            .value=${this.state.user}
             @change=${(e) => this.changeUser(e)}
             placeholder="Your name"
           />
@@ -274,7 +281,7 @@ class ChatApp extends CoupElement {
         <chat-room
           .room=${activeRoom}
           .messages=${roomMsgs}
-          .currentUser=${this.user}
+          .currentUser=${this.state.user}
         ></chat-room>
       </div>
     `
