@@ -45,20 +45,16 @@ class MyThing extends CoupElement {
 MyThing.define()
 ```
 
-## Reactive state (auto-renders on change)
+## State (manual render)
 
 ```js
-static state = { count: 0, items: [], user: null }
+state = { count: 0, items: [], user: null }
 
-// read/write directly on this
-this.count++
-this.items = [...this.items, item]
-this.user = { ...this.user, name: 'Ada' }
-
-// always assign new references — don't mutate
-// shallow equality means same-data skips re-render automatically
-
-// multiple changes in one tick = one render
+// read/write on this.state
+this.state.count++
+this.state.items = [...this.state.items, item]
+this.state.user = { ...this.state.user, name: 'Ada' }
+this.render() // explicit — you control when UI updates
 ```
 
 ## Props (parent → child, auto-renders on change)
@@ -101,8 +97,8 @@ template() {
     <my-child .items=${this.list}></my-child>
 
     <!-- event -->
-    <button @click=${() => this.count++}>+</button>
-    <input @input=${(e) => this.query = e.target.value}>
+    <button @click=${() => { this.state.count++; this.render() }}>+</button>
+    <input @input=${(e) => { this.state.query = e.target.value; this.render() }}>
 
     <!-- conditional -->
     ${this.show ? html`<p>visible</p>` : nothing}
@@ -132,7 +128,6 @@ disconnected()   // removed from DOM — clean up listeners, timers
 ```js
 // fires once per microtask with all batched changes
 propsChanged(changes)  // { propName: { old, new } }
-stateChanged(changes)  // { stateName: { old, new } }
 ```
 
 ## Events (child → parent, or any → any)
@@ -176,7 +171,7 @@ template() {
 // optional: control render timing for async work
 storeChanged(store, newState) {
   // auto-render is skipped when this is defined
-  // set static state properties or call this.render() when ready
+  // call this.render() when ready
 }
 ```
 
@@ -214,8 +209,8 @@ this.$$('input')    // querySelectorAll
 
 ```js
 CoupElement.debug = true
-// warns: mutation without render, undefined template(), shadowed method names
-// freezes state/prop objects to catch accidental mutation
+// warns: undefined template(), shadowed method names
+// freezes prop objects to catch accidental mutation
 // logs render triggers to console
 // shows visible error overlay when template() throws
 ```
