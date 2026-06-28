@@ -35,6 +35,7 @@ class CryptoList extends CoupElement {
     loading: false,
     done: false,
     error: null,
+    status: '',      // visible status text for the demo
   }
 
   connected() {
@@ -52,21 +53,34 @@ class CryptoList extends CoupElement {
     const sentinel = this.$('.sentinel')
     if (!sentinel) return
     this._observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) this.loadPage() },
+      ([entry]) => { if (entry.isIntersecting) this.loadPage(true) },
       { rootMargin: '200px' }
     )
     this._observer.observe(sentinel)
   }
 
-  async loadPage() {
+  _setStatus(text) {
+    this.state.status = text
+    this.render()
+    return new Promise(r => setTimeout(r, 600))
+  }
+
+  async loadPage(fromObserver = false) {
     if (this.state.loading || this.state.done) return
 
     this.state.loading = true
     this.state.error = null
-    this.render()
+
+    if (fromObserver) {
+      await this._setStatus('⏎ Sentinel entered viewport — IntersectionObserver fired')
+    }
+
+    const page = this.state.page
+    const url = `${API}?vs_currency=usd&order=market_cap_desc&per_page=50&page=${page}`
+
+    await this._setStatus(`↑ fetch( page ${page} )  — requesting 50 coins…`)
 
     try {
-      const url = `${API}?vs_currency=usd&order=market_cap_desc&per_page=50&page=${this.state.page}`
       const res = await fetch(url)
 
       if (!res.ok) {
@@ -77,18 +91,22 @@ class CryptoList extends CoupElement {
         )
       }
 
+      await this._setStatus(`↓ 200 OK — parsing JSON…`)
+
       const data = await res.json()
 
       if (!data.length) {
         this.state.done = true
       } else {
+        await this._setStatus(`✓ Got ${data.length} coins — appending to DOM`)
         this.state.coins = [...this.state.coins, ...data]
-        this.state.page = this.state.page + 1
+        this.state.page = page + 1
       }
     } catch (err) {
       this.state.error = err.message
     } finally {
       this.state.loading = false
+      this.state.status = ''
       this.render()
     }
   }
@@ -122,7 +140,7 @@ class CryptoList extends CoupElement {
 
       ${this.state.error ? html`<div class="error-msg">⚠️ ${this.state.error}</div>` : nothing}
 
-      ${this.state.loading ? html`<div class="spinner"></div>` : nothing}
+      ${this.state.status ? html`<div class="status-msg">${this.state.status}</div>` : nothing}
 
       ${this.state.done ? html`<div class="end-msg">All coins loaded</div>` : nothing}
 

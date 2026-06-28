@@ -48,6 +48,15 @@
     repo-card .meta { display: flex; gap: 16px; font-size: 12px; color: #8b949e; }
     repo-card .lang-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 4px; vertical-align: middle; }
     .empty { color: #8b949e; text-align: center; padding: 40px; }
+
+    /* ── Mobile ── */
+    @media (max-width: 600px) {
+      body { padding: 16px; }
+      .user-card { flex-wrap: wrap; }
+      .user-card img { width: 48px; height: 48px; }
+      .user-card .stats { flex-wrap: wrap; gap: 8px; font-size: 12px; }
+      .repos { grid-template-columns: 1fr; }
+    }
     .sort-bar { display: flex; gap: 8px; margin-bottom: 12px; }
     .sort-bar button {
       padding: 4px 12px; background: #21262d; border: 1px solid #30363d;

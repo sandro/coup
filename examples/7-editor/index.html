@@ -172,6 +172,16 @@
     .mode-toggle button.active {
       background: #111; color: #fff; border-color: #111;
     }
+
+    /* ── Mobile ── */
+    @media (max-width: 600px) {
+      body { padding: 0.75rem; }
+      .app-header h1 { font-size: 1.1rem; }
+      .app-header small { font-size: 0.7rem; }
+      .editor-split { min-height: 300px; }
+      .tiptap { padding: 0.75rem; font-size: 0.9rem; }
+      .toolbar-row button { padding: 0.25rem 0.4rem; font-size: 0.78rem; min-width: 1.6rem; }
+    }
   </style>
 </head>
 <body>

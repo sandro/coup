@@ -479,7 +479,7 @@ class BlockEditor extends CoupElement {
   }
 
   state = {
-    mode: 'split',       // 'write' | 'split' | 'code'
+    mode: window.innerWidth <= 600 ? 'write' : 'split',  // default to Write on mobile
     htmlContent: '',     // current HTML string for code view
   }
 

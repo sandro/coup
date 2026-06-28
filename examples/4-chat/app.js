@@ -114,7 +114,10 @@ class ChatRoom extends CoupElement {
     const msgs = this.messages || []
 
     return html`
-      <div class="chat-header"># ${this.room}</div>
+      <div class="chat-header">
+        <button class="sidebar-toggle" @click=${() => this.emit('chat:toggle-sidebar')}>☰</button>
+        # ${this.room}
+      </div>
 
       <div class="messages">
         ${repeat(
@@ -149,10 +152,12 @@ class ChatApp extends CoupElement {
 
   static events = {
     'chat:send': 'onSend',
+    'chat:toggle-sidebar': 'toggleSidebar',
   }
 
   state = {
     user: 'you',
+    sidebarOpen: false,
     messages: {
       general: [
         { id: 1, author: 'Ada',   text: 'welcome to #general!', time: '9:00 AM', system: false },
@@ -174,7 +179,10 @@ class ChatApp extends CoupElement {
   }
 
   connected() {
-    this._unsubRouter = router.subscribe(() => this.render())
+    this._unsubRouter = router.subscribe(() => {
+      this.state.sidebarOpen = false
+      this.render()
+    })
   }
 
   disconnected() {
@@ -241,6 +249,16 @@ class ChatApp extends CoupElement {
     }
   }
 
+  toggleSidebar() {
+    this.state.sidebarOpen = !this.state.sidebarOpen
+    this.render()
+  }
+
+  closeSidebar() {
+    this.state.sidebarOpen = false
+    this.render()
+  }
+
   template() {
     const activeRoom = this.activeRoom
 
@@ -254,14 +272,19 @@ class ChatApp extends CoupElement {
     }
 
     const roomMsgs = this.state.messages[activeRoom] || []
+    const sidebarOpen = this.state.sidebarOpen
 
     return html`
-      <div class="sidebar">
+      <div class="sidebar-backdrop ${sidebarOpen ? 'visible' : ''}"
+        @click=${() => this.closeSidebar()}></div>
+
+      <div class="sidebar ${sidebarOpen ? 'open' : ''}">
         <h2>Rooms</h2>
         ${ROOMS.map(room => html`
           <a
             class="room-btn ${room === activeRoom ? 'active' : ''}"
             href="#/${room}"
+            @click=${() => this.closeSidebar()}
           >
             # ${room}
             ${this.state.messages[room]?.length ? html`<span>(${this.state.messages[room].length})</span>` : ''}
