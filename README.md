@@ -1,4 +1,6 @@
-# coup
+<p align="center">
+  <img src="coup-logo.svg" alt="coup" width="172" />
+</p>
 
 They took the render loop. Take it back. That's a coup.
 
