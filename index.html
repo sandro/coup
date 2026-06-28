@@ -5,19 +5,57 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>coup — take back the render loop</title>
   <style>
+    /* --- Theme tokens --- */
+    :root {
+      --bg: #0a0a0a;
+      --fg: #eee;
+      --fg-muted: #b0b0b0;
+      --fg-faint: #888;
+      --fg-footer: #555;
+      --link: #58a6ff;
+      --surface: #161b22;
+      --border: #30363d;
+      --rule: #1c2128;
+      --code-fg: #e6edf3;
+      --syn-comment: #8b949e;
+      --syn-keyword: #ff7b72;
+      --syn-string: #a5d6ff;
+      --syn-func: #d2a8ff;
+      --syn-tag: #7ee787;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #fff;
+        --fg: #1a1a1a;
+        --fg-muted: #555;
+        --fg-faint: #777;
+        --fg-footer: #999;
+        --link: #0969da;
+        --surface: #f6f8fa;
+        --border: #d0d7de;
+        --rule: #d8dee4;
+        --code-fg: #1f2328;
+        --syn-comment: #6e7781;
+        --syn-keyword: #cf222e;
+        --syn-string: #0a3069;
+        --syn-func: #8250df;
+        --syn-tag: #116329;
+      }
+    }
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       font-family: system-ui, -apple-system, sans-serif;
-      background: #0a0a0a;
-      color: #eee;
+      background: var(--bg);
+      color: var(--fg);
       padding: 2rem 1.5rem;
       max-width: 720px;
       margin: 0 auto;
       line-height: 1.7;
     }
 
-    a { color: #58a6ff; }
+    a { color: var(--link); }
 
     /* --- Hero --- */
     .hero {
@@ -32,7 +70,7 @@
     }
     .hero .tagline {
       font-size: 1.25rem;
-      color: #aaa;
+      color: var(--fg-muted);
       font-weight: 400;
     }
 
@@ -44,10 +82,9 @@
       font-size: 1.5rem;
       font-weight: 700;
       margin-bottom: 1.25rem;
-      color: #eee;
     }
     section p {
-      color: #b0b0b0;
+      color: var(--fg-muted);
       margin-bottom: 1rem;
       font-size: 1rem;
     }
@@ -55,14 +92,14 @@
       margin-bottom: 0;
     }
     section p strong, section p em.bright {
-      color: #eee;
+      color: var(--fg);
       font-style: normal;
     }
 
     /* --- Code blocks --- */
     pre {
-      background: #161b22;
-      border: 1px solid #30363d;
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: 8px;
       padding: 1.25rem 1.5rem;
       overflow-x: auto;
@@ -72,25 +109,25 @@
     }
     pre code {
       font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-      color: #e6edf3;
+      color: var(--code-fg);
       padding: 0;
       background: none;
     }
     code {
       font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-      background: #161b22;
+      background: var(--surface);
       padding: 0.15em 0.4em;
       border-radius: 4px;
       font-size: 0.9em;
-      color: #e6edf3;
+      color: var(--code-fg);
     }
 
-    .comment { color: #8b949e; }
-    .keyword { color: #ff7b72; }
-    .string { color: #a5d6ff; }
-    .func { color: #d2a8ff; }
-    .tag { color: #7ee787; }
-    .punct { color: #8b949e; }
+    .comment { color: var(--syn-comment); }
+    .keyword { color: var(--syn-keyword); }
+    .string { color: var(--syn-string); }
+    .func { color: var(--syn-func); }
+    .tag { color: var(--syn-tag); }
+    .punct { color: var(--syn-comment); }
 
     /* --- Lifecycle list --- */
     .hooks {
@@ -100,14 +137,14 @@
     }
     .hooks li {
       padding: 0.5rem 0;
-      border-bottom: 1px solid #1c2128;
-      color: #b0b0b0;
+      border-bottom: 1px solid var(--rule);
+      color: var(--fg-muted);
     }
     .hooks li:last-child {
       border-bottom: none;
     }
     .hooks li code {
-      color: #d2a8ff;
+      color: var(--syn-func);
       margin-right: 0.5rem;
     }
 
@@ -122,15 +159,15 @@
     .examples li a {
       display: block;
       padding: 1rem 1.25rem;
-      background: #161b22;
-      border: 1px solid #30363d;
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: 8px;
       text-decoration: none;
-      color: #eee;
+      color: var(--fg);
       transition: border-color 0.15s;
     }
     .examples li a:hover {
-      border-color: #58a6ff;
+      border-color: var(--link);
     }
     .examples .name {
       font-weight: 600;
@@ -138,25 +175,25 @@
     }
     .examples .desc {
       font-size: 0.85rem;
-      color: #888;
+      color: var(--fg-faint);
     }
 
     /* --- Footer --- */
     footer {
       margin-top: 3rem;
       padding-top: 2rem;
-      border-top: 1px solid #1c2128;
-      color: #555;
+      border-top: 1px solid var(--rule);
+      color: var(--fg-footer);
       font-size: 0.85rem;
     }
     footer a {
-      color: #58a6ff;
+      color: var(--link);
     }
 
     /* --- Misc --- */
     hr {
       border: none;
-      border-top: 1px solid #1c2128;
+      border-top: 1px solid var(--rule);
       margin: 3rem 0;
     }
   </style>
@@ -174,7 +211,7 @@
     <h2 id="what-went-wrong">What went wrong</h2>
     <p>
       Somewhere along the way, we stopped building websites and started configuring them.
-      Adding a button that does something now requires a bundler, a transpiler, a framework,
+      Adding an interactive button now requires a bundler, a transpiler, a framework,
       a state management library, and 200MB of <code>node_modules</code> heavier than the
       application they exist to serve. The build pipeline takes longer to set up than
       the feature it enables.
@@ -182,10 +219,11 @@
     <p>
       And for what? So we can chain custom hooks five levels deep —
       <code>useAuth</code> calls <code>useUser</code> calls <code>useQuery</code> calls
-      <code>useMemo</code> — and when it breaks, the stack trace reads like
+      <code>useMemo</code> calls <code>useCallback</code> — and when it breaks, the stack trace reads like
       a riddle. State got so complicated we invented <em class="bright">atoms</em>.
-      Atoms! The fundamental unit of state is now a concept you import from a library
-      and wire together like particle physics. It's an object. It was always just an object.
+      Atoms! We took the simplest thing in programming — an object — rebranded it
+      as a primitive particle, and asked developers to wire them together like physics experiments.
+      It's an object. It was always just an object.
     </p>
     <p>
       Ask a React developer what happens when they call <code>setState</code>. Which components
@@ -206,9 +244,9 @@
       which is just telling it when to render with extra steps.
     </p>
     <p>
-      Frontend development is hard. React made it harder by trying to make it easier —
-      now "senior frontend engineer" means navigating framework internals instead of
-      building interfaces. The browser has had a native component model since 2020.
+      Frontend development is hard. React didn't simplify it — it moved the complexity
+      behind abstractions that break in new ways. Now "senior frontend engineer" means
+      navigating framework internals instead of building interfaces. The browser has had a native component model since 2020.
       <strong>The platform caught up years ago.</strong> The industry didn't notice because
       it was too busy configuring Webpack.
     </p>
@@ -250,7 +288,7 @@ MyCounter.<span class="func">define</span>()</code></pre>
     <p>
       Need a full app? Keep going. Parent-child props, shared stores, event-driven communication
       between components — coup scales from a single widget to an
-      <a href="examples/3-kanban/">entire SPA</a>. Same tool, same patterns, no second framework
+      <a href="examples/3-kanban/">full SPA with routing</a>. Same tool, same patterns, no second framework
       when things get "serious."
     </p>
   </section>
@@ -300,17 +338,18 @@ MyCounter.<span class="func">define</span>()</code></pre>
     <h2 id="what-we-learned">What we learned</h2>
     <p>
       We added reactive state to coup — set a property, the component re-renders automatically.
-      Elegant. Then we built a Spotify playlist manager with it and found the bugs: <code>.bind()</code>
-      in templates creating new function references every render, an SDK firing five events per track
-      change with equal-but-not-identical objects. <em class="bright">Invisible over-rendering</em> —
-      exactly what coup was built to prevent.
+      Elegant. Then we built a Spotify playlist manager with it and found the bugs:
+      SDK callbacks setting properties with equal-but-not-identical objects, each one
+      quietly triggering a render. <strong>169 renders per play click</strong> — and the response
+      was to start writing to the DOM directly, bypassing the framework to avoid the cost.
+      <em class="bright">Invisible over-rendering</em> — exactly what coup was built to prevent.
     </p>
     <p>
       So we reverted. Went back to <code>this.render()</code>. Added a two-line guard — if state
-      didn't actually change, don't render. <strong>169 renders per play click → 1.</strong>
+      didn't actually change, don't render. <strong>169 renders → 1.</strong>
       That guard was trivial to write because <code>this.render()</code> is a line you choose to add.
-      Under reactive state, <em class="bright">preventing</em> a render meant understanding the
-      framework's equality semantics. Much harder problem.
+      Under reactive state, <em class="bright">preventing</em> a render means understanding the
+      framework's equality semantics. A much harder problem.
     </p>
   </section>
 
@@ -398,7 +437,7 @@ MyCounter.<span class="func">define</span>()</code></pre>
     <pre><code>git clone https://github.com/sandro/coup.git
 <span class="keyword">cd</span> coup
 open examples/1-hello/index.html</code></pre>
-    <p style="margin-top: 1rem; color: #aaa;">No install. No build. No wait. That's a coup.</p>
+    <p style="margin-top: 1rem; color: var(--fg-muted);">No install. No build. No wait. That's a coup.</p>
   </section>
 
   <footer>
