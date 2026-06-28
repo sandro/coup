@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>coup — take back the render loop</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Righteous&display=swap" rel="stylesheet">
   <style>
     /* --- Theme tokens --- */
     :root {
@@ -49,7 +52,7 @@
       font-family: system-ui, -apple-system, sans-serif;
       background: var(--bg);
       color: var(--fg);
-      padding: 2rem 1.5rem;
+      padding: 1rem 1.5rem;
       max-width: 720px;
       margin: 0 auto;
       line-height: 1.7;
@@ -59,13 +62,14 @@
 
     /* --- Hero --- */
     .hero {
-      padding: 4rem 0 3rem;
+      padding: 1.5rem 0 1.5rem;
       text-align: center;
     }
     .hero h1 {
+      font-family: 'Righteous', cursive;
       font-size: 4rem;
-      font-weight: 800;
-      letter-spacing: -0.04em;
+      font-weight: 400;
+      letter-spacing: -0.02em;
       margin-bottom: 0.75rem;
     }
     .hero .tagline {
@@ -76,12 +80,12 @@
 
     /* --- Sections --- */
     section {
-      margin-bottom: 3.5rem;
+      margin-bottom: 2.5rem;
     }
     section h2 {
       font-size: 1.5rem;
       font-weight: 700;
-      margin-bottom: 1.25rem;
+      margin-bottom: 0.75rem;
     }
     section p {
       color: var(--fg-muted);
@@ -180,8 +184,8 @@
 
     /* --- Footer --- */
     footer {
-      margin-top: 3rem;
-      padding-top: 2rem;
+      margin-top: 2rem;
+      padding-top: 1.5rem;
       border-top: 1px solid var(--rule);
       color: var(--fg-footer);
       font-size: 0.85rem;
@@ -194,11 +198,18 @@
     hr {
       border: none;
       border-top: 1px solid var(--rule);
-      margin: 3rem 0;
+      margin: 2rem 0;
     }
   </style>
 </head>
 <body>
+
+  <!-- Nav -->
+  <nav style="text-align:center; font-size:0.85rem; color:var(--fg-footer);">
+    <a href="https://github.com/sandro/coup">Source on GitHub</a> ·
+    <a href="./docs.html">Docs</a> ·
+    <a href="#examples">Examples</a>
+  </nav>
 
   <!-- Hero -->
   <div class="hero">
@@ -442,7 +453,8 @@ open examples/1-hello/index.html</code></pre>
 
   <footer>
     <a href="https://github.com/sandro/coup">Source on GitHub</a> ·
-    <a href="./docs.html">Docs</a>
+    <a href="./docs.html">Docs</a> ·
+    <a href="#examples">Examples</a>
   </footer>
 
 </body>

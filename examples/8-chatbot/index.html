@@ -22,7 +22,7 @@
     <h1>AI Chat</h1>
     <div style="display:flex; gap:0.5rem;">
       <button class="mode-toggle" onclick="document.body.classList.toggle('dark'); this.textContent = document.body.classList.contains('dark') ? '☀ Light' : '☾ Dark'">☾ Dark</button>
-      <button class="mode-toggle" onclick="document.body.classList.toggle('embedded'); this.textContent = document.body.classList.contains('embedded') ? '⛶ Full page' : '◱ Embedded'">◱ Embedded</button>
+      <button class="mode-toggle" onclick="document.body.classList.toggle('embedded'); const em = document.body.classList.contains('embedded'); this.textContent = em ? '⛶ Full page' : '◱ Embedded'; const cb = document.querySelector('coup-chatbot'); cb.state.minimized = em; cb.render(); requestAnimationFrame(() => cb.render())">◱ Embedded</button>
     </div>
   </div>
 

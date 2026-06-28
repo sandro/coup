@@ -109,6 +109,7 @@ class CoupChatbot extends CoupElement {
     dragOver: false,
     pendingFiles: [],
     userHasScrolled: false,
+    minimized: true,  // embedded mode starts minimized (FAB visible)
   }
 
   // Internal bookkeeping — not rendered, no auto-render needed
@@ -142,6 +143,51 @@ class CoupChatbot extends CoupElement {
         this._processFiles(imageFiles)
       }
     }
+
+    // ── visualViewport: keep layout height = visible viewport ──
+    // When the mobile keyboard opens, visualViewport.height shrinks.
+    // We set a CSS custom property --vh so the body height tracks
+    // the actual visible area, not the full page behind the keyboard.
+    this._setViewportHeight = () => {
+      const vh = window.visualViewport
+        ? window.visualViewport.height * 0.01
+        : window.innerHeight * 0.01
+      document.documentElement.style.setProperty('--vh', `${vh}px`)
+
+      // On iOS, visualViewport fires resize but the scroll position
+      // of the outer page can shift. Pin it to 0.
+      if (window.visualViewport) {
+        window.scrollTo(0, 0)
+      }
+
+      // Re-scroll messages to bottom when keyboard opens/closes
+      requestAnimationFrame(() => {
+        const el = this.$('.cb-messages')
+        if (el && !this.state.userHasScrolled) {
+          el.scrollTop = el.scrollHeight
+        }
+      })
+    }
+
+    // Set initial value
+    this._setViewportHeight()
+
+    // Listen to visualViewport resize (keyboard open/close)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', this._setViewportHeight)
+      window.visualViewport.addEventListener('scroll', this._setViewportHeight)
+    } else {
+      window.addEventListener('resize', this._setViewportHeight)
+    }
+  }
+
+  disconnected() {
+    if (window.visualViewport) {
+      window.visualViewport.removeEventListener('resize', this._setViewportHeight)
+      window.visualViewport.removeEventListener('scroll', this._setViewportHeight)
+    } else {
+      window.removeEventListener('resize', this._setViewportHeight)
+    }
   }
 
   firstUpdated() {
@@ -158,10 +204,17 @@ class CoupChatbot extends CoupElement {
   }
 
   updated() {
+    // Toggle minimized class on the host element for CSS targeting
+    this.classList.toggle('cb-minimized', this.state.minimized && document.body.classList.contains('embedded'))
+
     // Autoscroll only if user hasn't scrolled up
     const el = this.$('.cb-messages')
     if (el && !this.state.userHasScrolled) {
       el.scrollTop = el.scrollHeight
+      // Double-tap: after visualViewport settles (keyboard open/close)
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight
+      })
     }
   }
 
@@ -366,6 +419,9 @@ class CoupChatbot extends CoupElement {
     this._setInput('')
     this.$('.cb-compose textarea')?.focus()
 
+    // After keyboard settles, re-pin viewport height and scroll
+    setTimeout(() => this._setViewportHeight?.(), 300)
+
     this.emit('chatbot:send', { message: text, files })
 
     // Add placeholder assistant message
@@ -524,6 +580,17 @@ class CoupChatbot extends CoupElement {
     this.render()
   }
 
+  // ── Minimize / Expand (embedded mode) ──
+
+  toggleMinimize() {
+    this.state.minimized = !this.state.minimized
+    this.render()
+    if (!this.state.minimized) {
+      // Focus input when expanding
+      requestAnimationFrame(() => this.$('textarea')?.focus())
+    }
+  }
+
   // ── Clear conversation ──
 
   clearChat() {
@@ -536,16 +603,29 @@ class CoupChatbot extends CoupElement {
   // ── Template ──
 
   template() {
-    const { messages, dragOver, pendingFiles, sending } = this.state
+    const { messages, dragOver, pendingFiles, sending, minimized } = this.state
     const placeholder = this.placeholder || 'Type a message…'
+    const isEmbedded = document.body.classList.contains('embedded')
 
     return html`
+      ${isEmbedded ? html`
+        <button class="cb-fab ${minimized ? '' : 'cb-fab-hidden'}"
+          @click=${() => this.toggleMinimize()}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+        </button>
+      ` : ''}
       <div class="cb-container ${dragOver ? 'cb-dragover' : ''}"
         @dragenter=${(e) => this.onDragEnter(e)}
         @dragover=${(e) => this.onDragOver(e)}
         @dragleave=${(e) => this.onDragLeave(e)}
         @drop=${(e) => this.onDrop(e)}
       >
+        <div class="cb-widget-header">
+          <span class="cb-widget-title">AI Chat</span>
+          <button class="cb-minimize" @click=${() => this.toggleMinimize()} title="Minimize">−</button>
+        </div>
         <div class="cb-messages">
           ${messages.length === 0 ? html`
             <div class="cb-empty">Drop an image or type a message to start.</div>
