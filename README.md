@@ -6,6 +6,8 @@ They took the render loop. Take it back. That's a coup.
 
 You don't need a build step. You don't need a virtual DOM. You don't need hooks, signals, effects, memos, reducers, selectors, or a PhD in reactivity theory to put HTML on a screen.
 
+Coup is a backbone you can graft opinions onto. It gives you the spine — rendering, events, lifecycle — and you attach whatever you want. No adapter layer, no plugin system, no "the coup way" of integrating things. It's your component, your DOM, your code.
+
 **Under 500 lines. One dependency ([lit-html](https://lit.dev/docs/libraries/standalone-templates/), ~3KB gzip). No build step. No CLI. No starter template.**
 
 > **[Live examples →](https://sandro.github.io/coup/)**
@@ -486,6 +488,20 @@ export const playlistStore = new Store({ playlists: [], active: null })
 | `static events` + `emit()` | Child needs to notify parent (or any ancestor) |
 | `Store` + `static subscribe` | Multiple unrelated components need the same data |
 
+**Events and stores are not interchangeable.** Events mean "something happened" — fire-and-forget, the child doesn't know or care who's listening. Stores mean "here is shared truth" — persistent state any component can read at any time. The test: **does the child know the consequence, or just report what happened?**
+
+```js
+// Event: child reports, parent decides what it means
+this.emit('task:completed', { id: this.task.id })
+
+// Store: child knows the mutation and owns it
+bookmarkStore.set(s => ({
+  bookmarks: s.bookmarks.filter(b => b.id !== id)
+}))
+```
+
+If you try to model events through stores, you end up turning actions into state — `store.set({ lastAction: 'remove', targetId: 5 })` — and now someone has to watch for that, react to it, and clear it. That's Redux all over again. Three tools, three jobs, zero overlap.
+
 ### Bring your own
 
 `Store` is intentionally minimal — no middleware, no devtools, no selectors. If you want something more, use any state library that has a subscribe pattern. The component side is always the same:
@@ -498,6 +514,55 @@ disconnected() { this._unsub() }
 ```
 
 See [`examples/6-bookmarks/`](./examples/6-bookmarks/) for a full working example with search, tag filtering, add/delete, and pin/unpin — all driven by a single shared store.
+
+### Derived state is just functions
+
+Other frameworks invented entire subsystems for computed/derived state — Vue has `computed()`, Svelte 5 has `$derived()`, Redux has selectors and `reselect`, Jotai has derived atoms. Coup's answer: write a function.
+
+```js
+// Derived from store — just a function, called when you need it
+function getFilteredBookmarks() {
+  const { bookmarks, search, filterTag } = bookmarkStore.state
+  return bookmarks
+    .filter(b => {
+      if (filterTag && !b.tags.includes(filterTag)) return false
+      if (search && !b.title.toLowerCase().includes(search.toLowerCase())) return false
+      return true
+    })
+    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
+}
+
+function getAllTags() {
+  const tags = new Set()
+  bookmarkStore.state.bookmarks.forEach(b => b.tags.forEach(t => tags.add(t)))
+  return [...tags].sort()
+}
+
+// Use in template — called every render, always fresh
+template() {
+  const bookmarks = getFilteredBookmarks()
+  const tags = getAllTags()
+  return html`...`
+}
+```
+
+No dependency tracking. No memoization layer. No stale cache invalidation bugs. The function runs when `template()` runs, reads current state, returns a result. If the computation is expensive, memoize it yourself — you know your data better than a framework does.
+
+This scales to any level of complexity:
+
+```js
+// Compose derived functions — it's just JavaScript
+function getPlaylistDuration(playlistId) {
+  const tracks = getPlaylistTracks(playlistId)
+  return tracks.reduce((sum, t) => sum + t.duration, 0)
+}
+
+function getPlaylistTracks(playlistId) {
+  return playerStore.state.tracks.filter(t => t.playlistId === playlistId)
+}
+```
+
+The "computed property" problem is only a problem when the framework owns your render loop and needs to know what changed. When *you* own the render loop, you just... compute things.
 
 ## Template Syntax (lit-html)
 
@@ -877,12 +942,53 @@ Runs a headless Playwright test suite covering rendering, adding, removing, reor
 | Decision | Rationale |
 |---|---|
 | **No shadow DOM** | Global CSS just works. No slots, no style encapsulation headaches. |
-| **Manual `this.state` + `render()`** | [We tried reactive state and reverted.](./REACTIVE_STATE_POSTMORTEM.md) Auto-rendering hides over-renders behind reference identity checks and external event timing. Explicit `this.render()` makes every render visible and grep-able — if the UI is wrong, search for the missing call. |
+| **Manual `this.state` + `render()`** | Auto-rendering hides over-renders behind reference identity checks and external event timing. Explicit `this.render()` makes every render visible and grep-able — if the UI is wrong, search for the missing call. |
 | **Auto-render on prop changes** | Props come from a parent — the parent is saying "your inputs changed." |
 | **`template()` vs `render()`** | Separating definition from trigger prevents accidental recursion. |
 | **Global events via `window`** | Simple pub/sub. No event bus library. Auto-cleanup on disconnect. |
 | **lit-html for templating** | Battle-tested, 3KB, efficient diffing, keyed lists via `repeat()`. |
 | **No build step** | Import maps + CDN. Copy `index.js` into your project and go. |
+| **No opinions about your architecture** | No Model class, no Collection, no prescribed folder structure, no opinion about your server or data shape. The only opinion is: you own the render loop. Everything else is your call. |
+
+## Closing a Fifteen-Year Loop
+
+Backbone (2010) had the right render model — you own the render, you call it when you're ready. What killed it wasn't the philosophy. It was the lack of efficient DOM diffing. You'd call `render()` and it would nuke the innerHTML — lost focus, lost scroll position, lost selection. React's virtual DOM solved that one problem, and the industry accepted an entire ideology along with it: the framework owns your renders, so now it needs hooks, effects, memos, and a dependency graph to know when things changed.
+
+Nobody went back to revisit the original idea because the industry had already moved on to "reactivity solves everything." But the pieces to do it right existed separately by 2017 — lit-html for surgical DOM updates, web components for encapsulation, browser events for communication. Coup assembles them.
+
+Backbone's manual render + lit-html's diffing + web components + browser events. Same control, none of the blowaway. And unlike Backbone, no opinions about your data layer — no Model, no Collection, no REST assumptions. Just the spine.
+
+## Why Not Redux / Zustand / Jotai / Signals?
+
+The state management story in frontend has been a fifteen-year detour. It's worth understanding how we got here and why coup doesn't follow.
+
+**The problem was never state.** It was React. React's model — UI as a pure function of state, top-down re-rendering, no mutation — meant that sharing state between distant components required threading props through every layer in between, or reaching for Context (which re-renders every consumer on any change). The ecosystem responded with increasingly elaborate solutions:
+
+- **Redux (2015):** Global state object, actions, reducers, selectors, middleware, thunks, sagas. Solved the prop-drilling problem. Created a boilerplate problem.
+- **MobX (2015):** Observable objects with automatic tracking. Mutate directly, it figures out what depends on what. Magical until you're debugging proxy traps wondering why something re-rendered.
+- **Recoil / Jotai / Zustand (2020+):** Atoms — tiny independent pieces of state, each with their own subscribers. Solves the re-render problem elegantly. But now your state is scattered across dozens of atoms, derived selectors chain between them, and understanding "what state exists in this app" requires tracing imports across every file.
+- **Signals (2022+):** Preact, Solid, Angular, Svelte 5 all converged here. Fine-grained reactivity primitives. Essentially: MobX was right about the model, wrong about the implementation. But now every framework has its own signal flavor and you need `$state`, `$derived`, `$effect`, `computed()`, `ref()`, or `signal()` to do what a variable and a function already do.
+
+**What they all have in common:** they exist because the framework owns the render loop and needs to know what changed. When the framework decides when to re-render, it needs a dependency graph, a diffing strategy, and a way to track which state each component reads. This is genuinely hard computer science — and the libraries are genuinely clever. But the complexity exists to solve a problem the framework created.
+
+**The browser already has a primitive for "Component A changed something, Component B needs to know."** It's called an event. `window.dispatchEvent(new CustomEvent('cart:updated', { detail: items }))`. Any component can listen. No imports between them. No provider wrappers. No dependency injection. No atom graphs. They share a contract — an event name and a shape — and that's it.
+
+The one gap events don't fill: a late-mounting component needs current state, not just future changes. That's what coup's `Store` is — 15 lines of code. An object you can read at any time, plus `subscribe()` for changes. Not a paradigm. Not an architecture. A plain object with a listener list.
+
+**Derived state is the same story.** Redux needs `reselect` for memoized selectors. Jotai needs derived atoms. Vue needs `computed()`. Svelte 5 needs `$derived()`. Coup needs... a function:
+
+```js
+function getFilteredBookmarks() {
+  const { bookmarks, search } = bookmarkStore.state
+  return bookmarks.filter(b => b.title.includes(search))
+}
+```
+
+No dependency tracking. No cache invalidation. It runs when you call it, reads current state, returns a result. If it's expensive, memoize it yourself — you know your data better than any framework.
+
+**The complexity-industrial complex.** Framework ecosystems need complexity to sustain conferences, courses, npm packages, and blog posts. "Just use browser events" doesn't generate a 40-minute conference talk. "Introducing our new atomic state primitive with nested selectors and middleware" does. Every layer of abstraction creates demand for the next layer that manages the first layer. The result is that a todo app needs three state libraries and a PhD in reactivity theory.
+
+Coup opts out. Events for communication. A plain object for shared state. Functions for derived data. `this.render()` when you're ready. The browser had most of this figured out before we started.
 
 ---
 
