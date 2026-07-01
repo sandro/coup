@@ -17,10 +17,14 @@ import { Plugin } from '@tiptap/pm/state'
 import { NodeSelection } from '@tiptap/pm/state'
 
 function nearestBlock(view, y) {
-  // Walk top-level nodes to find the one closest to cursor y
-  const doc = view.state.doc
   let best = null, bestDist = Infinity
-  doc.forEach((node, pos) => {
+
+  function check(node, pos) {
+    // Recurse into lists to find individual list items
+    if (node.type.name === 'bulletList' || node.type.name === 'orderedList') {
+      node.forEach((child, offset) => check(child, pos + 1 + offset))
+      return
+    }
     const dom = view.nodeDOM(pos)
     if (!dom || dom.nodeType !== 1) return
     const rect = dom.getBoundingClientRect()
@@ -30,7 +34,9 @@ function nearestBlock(view, y) {
       bestDist = dist
       best = { pos, dom, rect }
     }
-  })
+  }
+
+  view.state.doc.forEach((node, pos) => check(node, pos))
   return best
 }
 
@@ -42,11 +48,20 @@ const DragHandle = Extension.create({
     handle.className = 'drag-handle'
     handle.draggable = true
     handle.setAttribute('data-drag-handle', '')
-    handle.style.position = 'fixed'
-    handle.style.display = 'none'
-    document.body.appendChild(handle)
 
     let dragPos = null
+
+    function positionHandle(view, block) {
+      const wrapper = view.dom.closest('.wysiwyg-pane')
+      if (!wrapper || !block) { handle.style.display = 'none'; return }
+      const wrapperRect = wrapper.getBoundingClientRect()
+      const style = window.getComputedStyle(block.dom)
+      const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.4
+      const handleH = 20
+      handle.style.display = ''
+      handle.style.top = (block.rect.top - wrapperRect.top + (lineHeight - handleH) / 2) + 'px'
+      if (handle.parentNode !== wrapper) wrapper.appendChild(handle)
+    }
 
     handle.addEventListener('dragstart', (e) => {
       if (dragPos == null) return
@@ -75,14 +90,8 @@ const DragHandle = Extension.create({
           handleDOMEvents: {
             mousemove: (view, event) => {
               const block = nearestBlock(view, event.clientY)
-              if (!block) {
-                handle.style.display = 'none'
-                return false
-              }
-              const editorRect = view.dom.getBoundingClientRect()
-              handle.style.display = ''
-              handle.style.left = (editorRect.left - 24) + 'px'
-              handle.style.top = (block.rect.top + 2) + 'px'
+              if (!block) { handle.style.display = 'none'; return false }
+              positionHandle(view, block)
               dragPos = block.pos
               return false
             },
@@ -96,8 +105,9 @@ const DragHandle = Extension.create({
               return false
             },
             drop: (view, event) => {
-              // After drop, auto-join adjacent lists of the same type
+              const dropY = event.clientY
               setTimeout(() => {
+                // Auto-join adjacent lists of the same type
                 const { state, dispatch } = view
                 const { doc, tr } = state
                 let joined = false
@@ -112,31 +122,38 @@ const DragHandle = Extension.create({
                   }
                 })
                 if (joined) dispatch(tr)
+                // Reposition handle at the drop target
+                requestAnimationFrame(() => {
+                  const block = nearestBlock(view, dropY)
+                  if (block) positionHandle(view, block)
+                })
               }, 50)
               return false
             },
           },
         },
         view() {
-          return {
-            destroy() {
-              handle.remove()
-            },
-          }
+          return { destroy() { handle.remove() } }
         },
       }),
     ]
   },
 })
 
-// Simple HTML formatter — no dependencies, handles nesting and self-closing tags
+// Compact HTML formatter — block elements get their own lines,
+// inline content stays with its parent tag.
 const VOID_TAGS = new Set(['area','base','br','col','embed','hr','img','input','link','meta','source','track','wbr'])
-function prettyHTML(src) {
-  // Normalize: collapse whitespace between tags, trim
+const BLOCK_TAGS = new Set(['html','head','body','div','p','h1','h2','h3','h4','h5','h6',
+  'ul','ol','li','table','thead','tbody','tfoot','tr','td','th','blockquote','pre',
+  'section','article','aside','nav','header','footer','main','figure','figcaption',
+  'details','summary','dl','dt','dd','hr','form','fieldset'])
+
+function formatHTML(src) {
   let s = src.replace(/>\s+</g, '><').trim()
+  if (!s) return s
+  // Tokenize into tags and text runs
   const tokens = []
   let i = 0
-  // Tokenize into tags and text
   while (i < s.length) {
     if (s[i] === '<') {
       const end = s.indexOf('>', i)
@@ -150,26 +167,80 @@ function prettyHTML(src) {
       i = next
     }
   }
-  // Build indented output
+
+  // Check if a block's inner content is purely inline (no nested blocks).
+  // If so, keep it all on one line: <p>Text with <strong>bold</strong>.</p>
+  function isInlineRun(start) {
+    let depth = 0
+    for (let j = start; j < tokens.length; j++) {
+      const t = tokens[j]
+      if (!t.startsWith('<')) continue
+      const m = t.match(/^<\/?(\w+)/)
+      if (!m) continue
+      const tag = m[1].toLowerCase()
+      const closing = t.startsWith('</')
+      if (closing) {
+        depth--
+        if (depth < 0) return true // hit our own closing tag — all inline
+      } else if (BLOCK_TAGS.has(tag)) {
+        return false // nested block found
+      } else if (!VOID_TAGS.has(tag) && !t.endsWith('/>')) {
+        depth++
+      }
+    }
+    return true
+  }
+
   let indent = 0
+  const TAB = '  '
   const lines = []
-  const INDENT = '  '
-  for (const tok of tokens) {
-    if (tok.startsWith('</')) {
-      // Closing tag — dedent then print
+  let j = 0
+
+  while (j < tokens.length) {
+    const tok = tokens[j]
+    const isTag = tok.startsWith('<')
+    const isClose = tok.startsWith('</')
+    const m = isTag && tok.match(/^<\/?(\w+)/)
+    const tagName = m ? m[1].toLowerCase() : ''
+    const isBlock = BLOCK_TAGS.has(tagName)
+    const isVoid = VOID_TAGS.has(tagName) || tok.endsWith('/>')
+
+    if (isClose && isBlock) {
       indent = Math.max(0, indent - 1)
-      lines.push(INDENT.repeat(indent) + tok)
-    } else if (tok.startsWith('<')) {
-      // Opening or self-closing tag
-      const m = tok.match(/^<(\w+)/)
-      const tagName = m ? m[1].toLowerCase() : ''
-      const selfClose = tok.endsWith('/>') || VOID_TAGS.has(tagName)
-      lines.push(INDENT.repeat(indent) + tok)
-      if (!selfClose) indent++
+      lines.push(TAB.repeat(indent) + tok)
+      j++
+    } else if (isTag && isBlock && !isVoid) {
+      // Opening block — check if inner content is all inline
+      if (isInlineRun(j + 1)) {
+        // Collect everything up to and including the matching close tag
+        let line = TAB.repeat(indent) + tok
+        let depth = 1
+        j++
+        while (j < tokens.length && depth > 0) {
+          const t = tokens[j]
+          if (t.startsWith('</')) {
+            const cm = t.match(/^<\/(\w+)/)
+            if (cm && cm[1].toLowerCase() === tagName) depth--
+            if (depth > 0) line += t
+            else line += t
+          } else {
+            line += t
+          }
+          j++
+        }
+        lines.push(line)
+      } else {
+        lines.push(TAB.repeat(indent) + tok)
+        indent++
+        j++
+      }
+    } else if (isTag && isVoid && isBlock) {
+      lines.push(TAB.repeat(indent) + tok)
+      j++
     } else {
-      // Text node
-      const text = tok.trim()
-      if (text) lines.push(INDENT.repeat(indent) + text)
+      // Inline content between blocks — shouldn't happen often
+      lines.push(TAB.repeat(indent) + tok)
+      j++
     }
   }
   return lines.join('\n')
@@ -419,7 +490,7 @@ class CodeView extends CoupElement {
   formatHTML() {
     if (!this._cm) return
     const raw = this._cm.state.doc.toString()
-    const formatted = prettyHTML(raw)
+    const formatted = formatHTML(raw)
     if (formatted === raw) return
     this._updating = true
     this._cm.dispatch({
