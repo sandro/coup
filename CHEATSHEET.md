@@ -198,6 +198,37 @@ router.replace('/login')  // no history entry
 html`<a href="#/about">About</a>`
 ```
 
+## QueryClient (fetch cache)
+
+```js
+import { QueryClient } from 'coup/query.js'
+
+const qc = new QueryClient({ staleTime: 60_000, gcTime: 300_000 })
+
+// fetch with cache + dedup + retry:
+const users = await qc.fetch(['users', page], {
+  fn: ({ signal }) => fetch(`/api/users?page=${page}`, { signal }).then(r => r.json()),
+})
+
+// read cache synchronously (undefined on miss):
+const cached = qc.get(['users', page])
+
+// prefetch next page (fire-and-forget):
+qc.prefetch(['users', page + 1], { fn })
+
+// invalidate (prefix match), cancel, clear:
+qc.invalidate(['users'])   // mark stale
+qc.cancel(['users'])       // abort in-flight
+qc.clear()                 // nuke everything
+
+// optimistic update:
+qc.set(['users', page], optimisticData)
+
+// debug — expose in DevTools:
+if (CoupElement.debug) window.__qc = qc
+// then: __qc._cache, __qc._inflight, __qc._aborts
+```
+
 ## DOM queries
 
 ```js

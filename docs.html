@@ -210,6 +210,8 @@
       <a href="#updated">updated()</a>
       <div class="section-label">Routing</div>
       <a href="#router">Router</a>
+      <div class="section-label">Data Fetching</div>
+      <a href="#queryclient">QueryClient</a>
       <div class="section-label">Extras</div>
       <a href="#debug">Debug Mode</a>
       <a href="#helpers">Helpers</a>
@@ -983,6 +985,71 @@ router.<span class="fn">isActive</span>(<span class="str">'/user/:id'</span>) <s
 router.<span class="fn">destroy</span>()  <span class="cm">// clean up listeners</span></code></pre>
 
       <!-- ================================================================ -->
+      <h2 id="queryclient">QueryClient</h2>
+      <p>An optional fetch cache for when you need caching, deduplication, retry, and prefetching. It's a dumb cache, not a reactivity system — you call <code>fetch()</code>, get data, call <code>this.render()</code>. No background timers, no invisible refetching, no framework coupling.</p>
+
+      <h3>Creating a client</h3>
+      <pre><code><span class="kw">import</span> { QueryClient } <span class="kw">from</span> <span class="str">'coup/query.js'</span>
+
+<span class="kw">const</span> qc = <span class="kw">new</span> <span class="fn">QueryClient</span>({
+  staleTime: <span class="num">60_000</span>,   <span class="cm">// data considered fresh for 1 min (default)</span>
+  gcTime: <span class="num">300_000</span>,     <span class="cm">// unused entries garbage-collected after 5 min (default)</span>
+  retry: <span class="num">3</span>,            <span class="cm">// retry failed fetches (default)</span>
+})</code></pre>
+
+      <h3>Fetching with cache</h3>
+      <pre><code><span class="kw">const</span> users = <span class="kw">await</span> qc.<span class="fn">fetch</span>([<span class="str">'users'</span>, page], {
+  fn: ({ signal }) => <span class="fn">fetch</span>(<span class="str">`/api/users?page=${page}`</span>, { signal })
+    .then(r => r.<span class="fn">json</span>()),
+})</code></pre>
+      <p>If the data is fresh, it returns from cache instantly — no network request. If stale or missing, it fetches, caches, and returns. The <code>signal</code> is an <code>AbortSignal</code> for automatic cancellation.</p>
+
+      <h3>Reading cache synchronously</h3>
+      <pre><code><span class="kw">const</span> cached = qc.<span class="fn">get</span>([<span class="str">'users'</span>, page])  <span class="cm">// data or undefined</span></code></pre>
+      <p>Use this for instant cache-first rendering — show cached data immediately, fetch only on miss:</p>
+      <pre><code><span class="kw">this</span>.state.detail = qc.<span class="fn">get</span>([<span class="str">'detail'</span>, id]) || <span class="kw">null</span>
+<span class="kw">if</span> (<span class="kw">this</span>.state.detail) { <span class="kw">this</span>.<span class="fn">render</span>(); <span class="kw">return</span> }  <span class="cm">// cache hit — one render, no async</span>
+
+<span class="kw">const</span> data = <span class="kw">await</span> qc.<span class="fn">fetch</span>([<span class="str">'detail'</span>, id], { fn })  <span class="cm">// cache miss — fetch it</span></code></pre>
+
+      <h3>Prefetching</h3>
+      <pre><code><span class="cm">// Fire-and-forget — preloads the next page while user views current one</span>
+qc.<span class="fn">prefetch</span>([<span class="str">'users'</span>, page + <span class="num">1</span>], { fn })</code></pre>
+
+      <h3>Invalidation &amp; cancellation</h3>
+      <pre><code>qc.<span class="fn">invalidate</span>([<span class="str">'users'</span>])    <span class="cm">// mark all 'users' entries as stale (prefix match)</span>
+qc.<span class="fn">cancel</span>([<span class="str">'users'</span>])       <span class="cm">// abort in-flight 'users' request</span>
+qc.<span class="fn">clear</span>()                  <span class="cm">// nuke everything</span></code></pre>
+
+      <h3>Manual cache writes</h3>
+      <pre><code><span class="cm">// Optimistic update — set cache to expected value, render, let fetch confirm</span>
+qc.<span class="fn">set</span>([<span class="str">'users'</span>, page], optimisticData)</code></pre>
+
+      <h3>API summary</h3>
+      <table>
+        <thead><tr><th>Method</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td><code>fetch(key, { fn })</code></td><td>Return cached data if fresh, otherwise fetch and cache</td></tr>
+          <tr><td><code>get(key)</code></td><td>Read cache synchronously (undefined on miss)</td></tr>
+          <tr><td><code>set(key, data)</code></td><td>Write to cache manually (optimistic updates)</td></tr>
+          <tr><td><code>prefetch(key, { fn })</code></td><td>Like fetch but swallows errors (fire-and-forget)</td></tr>
+          <tr><td><code>invalidate(prefix)</code></td><td>Mark matching entries as stale (prefix match)</td></tr>
+          <tr><td><code>cancel(prefix)</code></td><td>Abort in-flight requests (prefix match)</td></tr>
+          <tr><td><code>clear()</code></td><td>Clear all cache and cancel all in-flight requests</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Debugging</h3>
+      <p><code>QueryClient</code> stores everything in plain <code>Map</code>s. Since <code>qc</code> is typically module-scoped, expose it on <code>window</code> in debug mode to inspect in DevTools:</p>
+      <pre><code><span class="kw">if</span> (CoupElement.debug) window.__qc = qc</code></pre>
+      <p>Then in the console:</p>
+      <pre><code>__qc._cache      <span class="cm">// all cached entries (key → { data, staleAt, gcAt })</span>
+__qc._inflight   <span class="cm">// in-flight promises</span>
+__qc._aborts     <span class="cm">// active AbortControllers</span></code></pre>
+
+      <p>See <a href="./examples/13-movies/">examples/13-movies/</a> for a working demo with search, pagination, prefetching, and cache hits.</p>
+
+      <!-- ================================================================ -->
       <h2 id="debug">Debug Mode</h2>
       <p>Flip one switch and coup watches your back.</p>
 
@@ -990,7 +1057,7 @@ router.<span class="fn">destroy</span>()  <span class="cm">// clean up listeners
 
       <p>When enabled:</p>
       <ul>
-        <li><strong>Render logging</strong> — every render logs to <code>console.debug</code> with the component tag and what triggered it (prop name or "manual")</li>
+        <li><strong>Render logging</strong> — every render logs to the console with a collapsed stack trace (click to expand the call stack)</li>
         <li><strong>Error overlay</strong> — if <code>template()</code> throws, a full-screen overlay shows the component, error message, and stack trace</li>
         <li><strong>Prop freezing</strong> — object and array props are frozen to catch accidental mutation</li>
         <li><strong>Prop shadowing</strong> — warns if a prop name conflicts with a CoupElement method</li>
