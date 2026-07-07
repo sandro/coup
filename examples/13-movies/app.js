@@ -6,7 +6,7 @@ CoupElement.debug = true
 // Demonstrates: cache hits, prefetching, abort, pagination,
 // rows-per-page with multi-page fetching, clear cache
 
-const API = 'https://www.omdbapi.com/?apikey=30eac5ba'
+const API = 'https://www.omdbapi.com/?apikey=67b2ce90'
 const qc = new QueryClient({ staleTime: 300_000 }) // 5 min cache for movie data
 
 const searchPage = (query, page, signal) =>
