@@ -101,10 +101,11 @@ Use the importmap approach for multi-page sites (shared lit-html cache). Use the
 import { CoupElement, Store, html, svg, nothing } from 'coup'
 import { repeat } from 'lit-html/directives/repeat.js'
 import { Router } from 'coup/router.js'
+import { QueryClient } from 'coup/query.js'
 
 // Standalone bundle — everything in one import
 import { CoupElement, Store, html, svg, nothing,
-         repeat, classMap, styleMap, unsafeHTML, Router
+         repeat, classMap, styleMap, unsafeHTML, Router, QueryClient
 } from 'https://esm.sh/coup-js/standalone'
 ```
 
@@ -119,6 +120,7 @@ import { CoupElement, Store, html, svg, nothing,
 | `styleMap` | lit-html | Dynamic inline styles (standalone only) |
 | `unsafeHTML` | lit-html | Render raw HTML strings (standalone only) |
 | `Router` | coup/router | Hash-based SPA router (standalone: included) |
+| `QueryClient` | coup/query | Lightweight fetch cache (standalone: included) |
 
 ### `CoupElement`
 
@@ -564,6 +566,110 @@ function getPlaylistTracks(playlistId) {
 
 The "computed property" problem is only a problem when the framework owns your render loop and needs to know what changed. When *you* own the render loop, you just... compute things.
 
+## Data Fetching with QueryClient
+
+Coup has no opinion on how you fetch data — `fetch()` in `connected()` works fine for most cases. `QueryClient` is an optional module for when you want caching, deduplication, retry, and prefetching. It's a dumb cache, not a reactivity system — you call `fetch()`, get data, call `this.render()`. No background timers, no invisible refetching, no framework coupling.
+
+### Creating a client
+
+```js
+import { QueryClient } from 'coup/query.js'
+
+const qc = new QueryClient({
+  staleTime: 60_000,   // data considered fresh for 1 min (default)
+  gcTime: 300_000,     // unused entries garbage-collected after 5 min (default)
+  retry: 3,            // retry failed requests 3 times (default)
+})
+```
+
+### Fetching with cache
+
+```js
+async loadUsers() {
+  this.state.loading = true
+  this.render()
+
+  try {
+    this.state.users = await qc.fetch(['users', this.state.page], {
+      fn: ({ signal }) =>
+        fetch(`/api/users?page=${this.state.page}`, { signal }).then(r => r.json()),
+    })
+  } catch (err) {
+    if (err.name !== 'AbortError') this.state.error = err.message
+  }
+
+  this.state.loading = false
+  this.render()
+}
+```
+
+The `fn` receives a `signal` for automatic cancellation. The cache key `['users', page]` determines identity — different key, different cache entry. Switching back to a previous key returns cached data instantly.
+
+### Key concepts
+
+**Cache keys** — arrays of strings/numbers. Different values = different entries:
+
+```js
+qc.fetch(['users', page, perPage], { fn: ... })
+// ['users', 1, 10] and ['users', 1, 25] are separate cache entries
+```
+
+**Prefetching** — preload data before the user needs it. Errors are silently swallowed:
+
+```js
+qc.prefetch(['users', nextPage], { fn: ... })
+```
+
+**Invalidation** — prefix match. Stales all matching entries. Next `fetch()` will re-request:
+
+```js
+qc.invalidate(['users'])  // stales ['users', 1], ['users', 2], etc.
+qc.invalidate()           // stale everything
+```
+
+**Optimistic updates** — write to cache manually, render immediately, let the real fetch confirm:
+
+```js
+qc.set(['users', page], optimisticData)
+```
+
+**Cancellation** — abort in-flight requests:
+
+```js
+qc.cancel(['users'])  // abort the in-flight fetch for this key
+```
+
+**Reading cache** — synchronous cache read, returns `undefined` on miss:
+
+```js
+const cached = qc.get(['users', page])
+```
+
+### The pagination pattern
+
+Changing page size creates a new cache key, which triggers a new fetch. The old key stays cached — switching back is instant:
+
+```js
+onPerPageChange(e) {
+  this.state.perPage = Number(e.target.value)
+  this.state.page = 1
+  this.loadUsers()  // new key → new fetch. old key stays cached.
+}
+```
+
+### When to use what
+
+| Pattern | Use when |
+|---|---|
+| `fetch()` in `connected()` | Simple one-time data load |
+| `QueryClient` | Multiple fetches of same data, pagination, prefetching, retry |
+
+### Bring your own
+
+`QueryClient` has no DOM dependency — it's a pure JS cache. Works in Node, workers, anywhere.
+
+See [`examples/13-movies/`](./examples/13-movies/) for a working example with search, pagination, prefetching, and cache hits.
+
 ## Template Syntax (lit-html)
 
 Coup uses [lit-html](https://lit.dev/docs/templates/overview/) for templating. The `html` tag, binding prefixes, and directives all come from lit-html — coup just re-exports them. For the full reference, see the [lit-html docs](https://lit.dev/docs/templates/overview/).
@@ -924,6 +1030,7 @@ examples/
   10-datatable/ — sortable, filterable, paginated data table (250 countries, embedded data)
   11-crypto/    — infinite scroll with crypto prices (IntersectionObserver, paginated API)
   12-form/      — signup form with field-level validation, dirty/touched tracking, async submit
+  13-movies/    — movie search with QueryClient: caching, prefetch, pagination, abort
 ```
 
 Run any example: `npx serve . -p 3000` then open `/examples/1-hello/`.
