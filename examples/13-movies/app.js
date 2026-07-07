@@ -49,10 +49,28 @@ class MovieSearch extends CoupElement {
     this.render()
   }
 
+  // Build results from cache synchronously. Returns null on any cache miss.
+  _cachedResults(query, page) {
+    const pagesNeeded = this.state.perPage / 10
+    const startPage = (page - 1) * pagesNeeded + 1
+    const pages = []
+    for (let i = 0; i < pagesNeeded; i++) {
+      const cached = qc.get(['search', query, startPage + i])
+      if (!cached) return null
+      pages.push(cached)
+    }
+    if (pages[0].Response === 'False') return null
+    return {
+      movies: pages.flatMap(p => p.Search || []),
+      totalResults: parseInt(pages[0].totalResults, 10),
+    }
+  }
+
   async _doSearch(query, page) {
     const { perPage } = this.state
     const pagesNeeded = perPage / 10  // OMDb returns 10 per page
     const startPage = (page - 1) * pagesNeeded + 1
+    const allCached = !!this._cachedResults(query, page)
 
     this.state.loading = true
     this.state.error = null
@@ -60,11 +78,6 @@ class MovieSearch extends CoupElement {
     this.render()
 
     try {
-      // Check cache before fetching (for "cached" badge)
-      let allCached = true
-      for (let i = 0; i < pagesNeeded; i++)
-        if (!qc.get(['search', query, startPage + i])) allCached = false
-
       // Fetch all needed OMDb pages (may resolve from cache instantly)
       const pages = await Promise.all(
         Array.from({ length: pagesNeeded }, (_, i) =>
@@ -142,8 +155,22 @@ class MovieSearch extends CoupElement {
     this.state.detailId = null
     this.state.detail = null
     this.state.detailError = null
-    if (this.state.query) this._doSearch(this.state.query, this.state.page)
-    else this.render()
+
+    if (this.state.query) {
+      // Restore from cache synchronously (single render, no async overhead).
+      // Falls back to full fetch only on cache miss.
+      const results = this._cachedResults(this.state.query, this.state.page)
+      if (results) {
+        this.state.results = results
+        this.state.cached = true
+        this.state.loading = false
+        this.render()
+        return
+      }
+      this._doSearch(this.state.query, this.state.page)
+    } else {
+      this.render()
+    }
   }
 
   _clearCache() {
