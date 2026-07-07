@@ -289,7 +289,7 @@ export class CoupElement extends HTMLElement {
     if (this._rendering) return
     this._rendering = true
     this._renderPending = false  // clear so scheduled microtask is a no-op
-    if (_debug) console.debug(`[coup] <${this.constructor.tag}> render`)
+    if (_debug) { console.groupCollapsed(`[coup] <${this.constructor.tag}> render`); console.trace(); console.groupEnd() }
     let ok = false
     try {
       const result = this.template()
