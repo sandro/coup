@@ -133,6 +133,7 @@ class MovieSearch extends CoupElement {
     this.state.detailId = id
     this.state.detail = qc.get(['detail', id]) || null  // instant if cached
     this.state.detailLoading = !this.state.detail
+    this.state.detailCached = !!this.state.detail
     this.state.detailError = null
     this.render()
     if (this.state.detail) return // cache hit — already rendered
@@ -183,9 +184,9 @@ class MovieSearch extends CoupElement {
 
   template() {
     const { query, results, loading, error, perPage, cached } = this.state
-    const { detailId, detail, detailLoading, detailError } = this.state
+    const { detailId, detail, detailLoading, detailError, detailCached } = this.state
 
-    if (detailId) return this._detailTemplate(detail, detailLoading, detailError)
+    if (detailId) return this._detailTemplate(detail, detailLoading, detailError, detailCached)
 
     const totalResults = results?.totalResults || 0
     const totalPages = Math.ceil(totalResults / perPage)
@@ -256,7 +257,7 @@ class MovieSearch extends CoupElement {
     `
   }
 
-  _detailTemplate(detail, loading, error) {
+  _detailTemplate(detail, loading, error, cached) {
     return html`
       <button class="back-btn" @click=${() => this._backToResults()}>← Back to results</button>
 
@@ -267,7 +268,7 @@ class MovieSearch extends CoupElement {
         <div class="detail">
           <img src=${poster(detail.Poster)} alt=${detail.Title}>
           <div class="detail-info">
-            <h2>${detail.Title}</h2>
+            <h2>${detail.Title} ${cached ? html`<span class="cached-badge">⚡ cached</span>` : nothing}</h2>
             <div class="detail-meta">${detail.Year} · ${detail.Rated} · ${detail.Runtime}</div>
             <div class="detail-row">${detail.Plot}</div>
             <div class="detail-row"><span class="detail-label">Director:</span> ${detail.Director}</div>
