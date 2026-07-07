@@ -664,6 +664,24 @@ onPerPageChange(e) {
 | `fetch()` in `connected()` | Simple one-time data load |
 | `QueryClient` | Multiple fetches of same data, pagination, prefetching, retry |
 
+### Debugging
+
+`QueryClient` stores everything in plain `Map`s. To inspect them in DevTools, expose your instance on `window`:
+
+```js
+if (CoupElement.debug) window.__qc = qc
+```
+
+Then in the console:
+
+```js
+__qc._cache      // all cached entries (key → { data, staleAt, gcAt })
+__qc._inflight   // in-flight promises (key → Promise)
+__qc._aborts     // active AbortControllers (key → AbortController)
+```
+
+No special debug tools needed — it's just Maps.
+
 ### Bring your own
 
 `QueryClient` has no DOM dependency — it's a pure JS cache. Works in Node, workers, anywhere.
