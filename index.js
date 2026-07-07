@@ -245,7 +245,7 @@ export class CoupElement extends HTMLElement {
               if (Array.isArray(val) || p === Object.prototype || p === null) Object.freeze(val)
             }
             this._props[name] = val
-            if (_debug) this._lastPropChange = name
+
             this._scheduleRender()
             if (this._connected && this.propsChanged) {
               // Batch prop changes — fire once after all props are set
@@ -289,11 +289,7 @@ export class CoupElement extends HTMLElement {
     if (this._rendering) return
     this._rendering = true
     this._renderPending = false  // clear so scheduled microtask is a no-op
-    if (_debug) {
-      const trigger = this._lastPropChange || 'manual'
-      console.debug(`[coup] <${this.constructor.tag}> render (${trigger})`)
-      this._lastPropChange = null
-    }
+    if (_debug) console.debug(`[coup] <${this.constructor.tag}> render`)
     let ok = false
     try {
       const result = this.template()
