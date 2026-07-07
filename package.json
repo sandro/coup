@@ -8,16 +8,18 @@
   "exports": {
     ".": "./index.js",
     "./standalone": "./coup.bundle.js",
-    "./router.js": "./router.js"
+    "./router.js": "./router.js",
+    "./query.js": "./query.js"
   },
   "files": [
     "index.js",
     "coup.bundle.js",
-    "router.js"
+    "router.js",
+    "query.js"
   ],
   "scripts": {
     "bundle": "esbuild bundle-entry.js --bundle --format=esm --minify --outfile=coup.bundle.js",
-    "test": "node test.mjs && node test-examples.mjs"
+    "test": "node test.mjs && node test-query.mjs && node test-examples.mjs"
   },
   "keywords": ["web-components", "custom-elements", "lit-html", "zero-build", "framework"],
   "author": "Sandro Turriate",
